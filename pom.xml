@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.casehubio</groupId>
+    <artifactId>casehub-parent</artifactId>
+    <version>0.2-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>casehub-connectors-parent</artifactId>
+  <version>0.2-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CaseHub Connectors — Parent</name>
+  <description>Lightweight outbound message connectors for the CaseHub platform.
+Provides a unified Connector SPI with built-in implementations for Slack (Incoming Webhooks),
+Microsoft Teams (Adaptive Cards), Twilio SMS, WhatsApp Business API, and Email (quarkus-mailer).
+Zero heavy dependencies — HTTP-based connectors use java.net.http only.</description>
+  <url>https://github.com/casehubio/casehub-connectors</url>
+
+  <modules>
+    <module>connectors-core</module>
+    <module>connectors-email</module>
+  </modules>
+
+  <properties>
+    <quarkus.version>3.32.2</quarkus.version>
+    <maven.compiler.release>21</maven.compiler.release>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-bom</artifactId>
+        <version>${quarkus.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>3.26.3</version>
+        <scope>test</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <repositories>
+    <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/casehubio/*</url>
+      <snapshots><enabled>true</enabled></snapshots>
+    </repository>
+  </repositories>
+
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/casehubio/casehub-connectors</url>
+    </repository>
+  </distributionManagement>
+
+</project>

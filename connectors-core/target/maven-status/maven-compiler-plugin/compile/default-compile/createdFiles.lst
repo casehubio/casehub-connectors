@@ -1,0 +1,7 @@
+io/casehubio/connectors/Connector.class
+io/casehubio/connectors/ConnectorMessage.class
+io/casehubio/connectors/teams/TeamsConnector.class
+io/casehubio/connectors/whatsapp/WhatsAppConnector.class
+io/casehubio/connectors/slack/SlackConnector.class
+io/casehubio/connectors/twilio/TwilioSmsConnector.class
+io/casehubio/connectors/http/HttpHelper.class

@@ -1,0 +1,80 @@
+package io.casehubio.connectors.whatsapp;
+
+import java.util.logging.Logger;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import io.casehubio.connectors.Connector;
+import io.casehubio.connectors.ConnectorMessage;
+import io.casehubio.connectors.http.HttpHelper;
+
+/**
+ * WhatsApp Business connector via the Meta Cloud API.
+ *
+ * <p>
+ * {@link ConnectorMessage#destination()} is the recipient E.164 phone number
+ * (e.g. {@code +447700900000}).
+ * {@link ConnectorMessage#body()} is the message text.
+ *
+ * <h2>Configuration</h2>
+ * <pre>
+ * casehub.connectors.whatsapp.api-token=EAAxxxx...
+ * casehub.connectors.whatsapp.phone-number-id=12345678901234
+ * </pre>
+ *
+ * <p>
+ * This connector sends free-form text messages. For template messages (required
+ * for the first 24-hour window), extend this connector or use
+ * {@link ConnectorMessage#attributes()} with key {@code templateName}.
+ *
+ * <p>
+ * If {@code api-token} is blank, all {@code send()} calls are logged and no-op'd.
+ */
+@ApplicationScoped
+public class WhatsAppConnector implements Connector {
+
+    public static final String ID = "whatsapp";
+
+    private static final Logger LOG = Logger.getLogger(WhatsAppConnector.class.getName());
+
+    @Inject
+    @ConfigProperty(name = "casehub.connectors.whatsapp.api-token", defaultValue = "")
+    String apiToken;
+
+    @Inject
+    @ConfigProperty(name = "casehub.connectors.whatsapp.phone-number-id", defaultValue = "")
+    String phoneNumberId;
+
+    @Override
+    public String id() {
+        return ID;
+    }
+
+    @Override
+    public void send(final ConnectorMessage message) {
+        if (apiToken.isBlank() || phoneNumberId.isBlank()) {
+            LOG.warning("WhatsAppConnector: casehub.connectors.whatsapp.* not configured — message not sent");
+            return;
+        }
+
+        final String url = "https://graph.facebook.com/v18.0/" + phoneNumberId + "/messages";
+        final String to = message.destination().replaceAll("[^0-9+]", "");
+        final String text = message.body() != null ? message.body() : "";
+
+        final String json = "{"
+                + "\"messaging_product\":\"whatsapp\","
+                + "\"to\":" + HttpHelper.jsonQuote(to) + ","
+                + "\"type\":\"text\","
+                + "\"text\":{\"body\":" + HttpHelper.jsonQuote(text) + "}"
+                + "}";
+
+        final boolean ok = HttpHelper.postJson(url, json,
+                "Authorization", "Bearer " + apiToken);
+        if (!ok) {
+            LOG.warning("WhatsApp connector failed to: " + to);
+        }
+    }
+}
