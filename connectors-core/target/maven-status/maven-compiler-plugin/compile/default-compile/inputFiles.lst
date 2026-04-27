@@ -1,7 +1,0 @@
-/Users/mdproctor/claude/casehub-connectors/connectors-core/src/main/java/io/casehubio/connectors/Connector.java
-/Users/mdproctor/claude/casehub-connectors/connectors-core/src/main/java/io/casehubio/connectors/ConnectorMessage.java
-/Users/mdproctor/claude/casehub-connectors/connectors-core/src/main/java/io/casehubio/connectors/http/HttpHelper.java
-/Users/mdproctor/claude/casehub-connectors/connectors-core/src/main/java/io/casehubio/connectors/slack/SlackConnector.java
-/Users/mdproctor/claude/casehub-connectors/connectors-core/src/main/java/io/casehubio/connectors/teams/TeamsConnector.java
-/Users/mdproctor/claude/casehub-connectors/connectors-core/src/main/java/io/casehubio/connectors/twilio/TwilioSmsConnector.java
-/Users/mdproctor/claude/casehub-connectors/connectors-core/src/main/java/io/casehubio/connectors/whatsapp/WhatsAppConnector.java
