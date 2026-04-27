@@ -62,6 +62,10 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
       <id>github</id>
       <url>https://maven.pkg.github.com/casehubio/casehub-connectors</url>
     </repository>
+    <snapshotRepository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/casehubio/casehub-connectors</url>
+    </snapshotRepository>
   </distributionManagement>
 
 </project>
