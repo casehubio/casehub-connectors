@@ -1,4 +1,4 @@
-package io.casehubio.connectors;
+package io.casehub.connectors;
 
 /**
  * SPI for outbound message delivery.

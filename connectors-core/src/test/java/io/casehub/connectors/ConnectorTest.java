@@ -1,4 +1,4 @@
-package io.casehubio.connectors;
+package io.casehub.connectors;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.ok;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -14,9 +14,9 @@ import org.junit.jupiter.api.Test;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 
-import io.casehubio.connectors.slack.SlackConnector;
-import io.casehubio.connectors.teams.TeamsConnector;
-import io.casehubio.connectors.http.HttpHelper;
+import io.casehub.connectors.slack.SlackConnector;
+import io.casehub.connectors.teams.TeamsConnector;
+import io.casehub.connectors.http.HttpHelper;
 
 /**
  * Unit and WireMock integration tests for connector implementations.

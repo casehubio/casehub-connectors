@@ -1,4 +1,4 @@
-package io.casehubio.connectors.twilio;
+package io.casehub.connectors.twilio;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -13,9 +13,9 @@ import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import io.casehubio.connectors.Connector;
-import io.casehubio.connectors.ConnectorMessage;
-import io.casehubio.connectors.http.HttpHelper;
+import io.casehub.connectors.Connector;
+import io.casehub.connectors.ConnectorMessage;
+import io.casehub.connectors.http.HttpHelper;
 
 /**
  * Twilio SMS connector via the Twilio Messages REST API.

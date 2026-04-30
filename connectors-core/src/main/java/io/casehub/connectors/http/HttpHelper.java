@@ -1,4 +1,4 @@
-package io.casehubio.connectors.http;
+package io.casehub.connectors.http;
 
 import java.net.URI;
 import java.net.http.HttpClient;

@@ -1,4 +1,4 @@
-package io.casehubio.connectors.email;
+package io.casehub.connectors.email;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -8,7 +8,7 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 
-import io.casehubio.connectors.ConnectorMessage;
+import io.casehub.connectors.ConnectorMessage;
 import io.quarkus.mailer.MockMailbox;
 import io.quarkus.test.junit.QuarkusTest;
 

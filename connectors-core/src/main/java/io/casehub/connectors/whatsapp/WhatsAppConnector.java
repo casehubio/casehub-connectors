@@ -1,4 +1,4 @@
-package io.casehubio.connectors.whatsapp;
+package io.casehub.connectors.whatsapp;
 
 import java.util.logging.Logger;
 
@@ -7,9 +7,9 @@ import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import io.casehubio.connectors.Connector;
-import io.casehubio.connectors.ConnectorMessage;
-import io.casehubio.connectors.http.HttpHelper;
+import io.casehub.connectors.Connector;
+import io.casehub.connectors.ConnectorMessage;
+import io.casehub.connectors.http.HttpHelper;
 
 /**
  * WhatsApp Business connector via the Meta Cloud API.

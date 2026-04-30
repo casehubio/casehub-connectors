@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.casehubio</groupId>
+    <groupId>io.casehub</groupId>
     <artifactId>casehub-connectors-parent</artifactId>
     <version>0.2-SNAPSHOT</version>
   </parent>
@@ -18,7 +18,7 @@ configured — keeping it separate makes it truly optional.</description>
 
   <dependencies>
     <dependency>
-      <groupId>io.casehubio</groupId>
+      <groupId>io.casehub</groupId>
       <artifactId>casehub-connectors</artifactId>
       <version>${project.version}</version>
     </dependency>

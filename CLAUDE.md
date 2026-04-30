@@ -17,9 +17,9 @@ https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/caseh
 ```
 
 **Other repo deep-dives** (fetch the relevant ones when your implementation touches their domain):
-- quarkus-ledger: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/quarkus-ledger.md`
-- quarkus-work: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/quarkus-work.md`
-- quarkus-qhorus: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/quarkus-qhorus.md`
+- casehub-ledger: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-ledger.md`
+- casehub-work: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-work.md`
+- casehub-qhorus: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-qhorus.md`
 - casehub-engine: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-engine.md`
 - claudony: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/claudony.md`
 

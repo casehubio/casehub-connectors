@@ -1,12 +1,12 @@
-package io.casehubio.connectors.email;
+package io.casehub.connectors.email;
 
 import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import io.casehubio.connectors.Connector;
-import io.casehubio.connectors.ConnectorMessage;
+import io.casehub.connectors.Connector;
+import io.casehub.connectors.ConnectorMessage;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.Mailer;
 

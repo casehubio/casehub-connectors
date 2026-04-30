@@ -1,12 +1,12 @@
-package io.casehubio.connectors.slack;
+package io.casehub.connectors.slack;
 
 import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import io.casehubio.connectors.Connector;
-import io.casehubio.connectors.ConnectorMessage;
-import io.casehubio.connectors.http.HttpHelper;
+import io.casehub.connectors.Connector;
+import io.casehub.connectors.ConnectorMessage;
+import io.casehub.connectors.http.HttpHelper;
 
 /**
  * Slack connector via Incoming Webhooks.
