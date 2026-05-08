@@ -135,3 +135,13 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home  # Graa
 CI must use `server-id: github` + `GITHUB_TOKEN` in `actions/setup-java`.
 
 **Cross-project SNAPSHOT versions:** All casehubio artifacts are `0.2-SNAPSHOT` resolved from GitHub Packages.
+
+
+## Development Workflow
+
+Before designing: `superpowers:brainstorming`
+Before implementing: `superpowers:test-driven-development`
+Before committing: `superpowers:requesting-code-review`
+
+Living docs — check for drift after significant changes:
+- `docs/adr/INDEX.md`
