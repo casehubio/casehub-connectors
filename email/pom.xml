@@ -19,7 +19,7 @@ configured — keeping it separate makes it truly optional.</description>
   <dependencies>
     <dependency>
       <groupId>io.casehub</groupId>
-      <artifactId>casehub-connectors</artifactId>
+      <artifactId>casehub-connectors-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

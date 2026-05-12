@@ -24,7 +24,7 @@ Provides a unified `Connector` SPI with built-in implementations for:
 <!-- HTTP-based connectors: Slack, Teams, Twilio SMS, WhatsApp -->
 <dependency>
   <groupId>io.casehubio</groupId>
-  <artifactId>casehub-connectors</artifactId>
+  <artifactId>casehub-connectors-core</artifactId>
   <version>0.2-SNAPSHOT</version>
 </dependency>
 

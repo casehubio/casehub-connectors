@@ -22,8 +22,8 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
   <url>https://github.com/casehubio/connectors</url>
 
   <modules>
-    <module>connectors-core</module>
-    <module>connectors-email</module>
+    <module>core</module>
+    <module>email</module>
   </modules>
 
   <properties>

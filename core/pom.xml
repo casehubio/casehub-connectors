@@ -10,7 +10,7 @@
     <version>0.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>casehub-connectors</artifactId>
+  <artifactId>casehub-connectors-core</artifactId>
   <name>CaseHub Connectors — Core</name>
   <description>HTTP-based outbound connectors: Slack, Teams, Twilio SMS, WhatsApp.
 No dependencies beyond CDI and java.net.http — usable in any Quarkus application.</description>
