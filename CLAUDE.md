@@ -31,6 +31,17 @@ Run `add-dir /Users/mdproctor/claude/casehub/connectors` before any other work.
 - `blog/` — project diary entries with INDEX.md
 - `design/` — epic journal (created by `epic` at branch start)
 
+## Git Discipline
+
+Two git repositories are active in every session:
+- **Workspace** (`/Users/mdproctor/claude/public/casehub/connectors`) — methodology artifacts: handover, blog, specs, plans, ADRs
+- **Project repo** (`/Users/mdproctor/claude/casehub/connectors`) — source code
+
+Before any git operation, run `git rev-parse --show-toplevel` to confirm which repo is currently active. Do not assume — the session may have opened in either. cd to the correct repo before staging:
+- Source code commits → project repo
+- Methodology artifacts → workspace
+
+
 ## Rules
 
 - All methodology artifacts go here, not in the project repo
@@ -56,26 +67,26 @@ Run `add-dir /Users/mdproctor/claude/casehub/connectors` before any other work.
 
 This repo is one component of the casehubio multi-repo platform. **Before implementing anything — any feature, SPI, data model, or abstraction — run the Platform Coherence Protocol.**
 
-> **Platform docs:** Local paths use `~/claude/casehub/parent/docs/` as root. If a path doesn't exist, the parent repo isn't cloned locally — fetch from `https://raw.githubusercontent.com/casehubio/parent/main/docs/<path>` instead.
+> **Platform docs:** Local paths use `../parent/docs/` as root. If a path doesn't exist, the parent repo isn't cloned locally — fetch from `https://raw.githubusercontent.com/casehubio/parent/main/docs/<path>` instead.
 
 The protocol asks: Does this already exist elsewhere? Is this the right repo for it? Does this create a consolidation opportunity? Is this consistent with how the platform handles the same concern in other repos?
 
 **Platform architecture (fetch before any implementation decision):**
 ```
-~/claude/casehub/parent/docs/PLATFORM.md
+../parent/docs/PLATFORM.md
 ```
 
 **This repo's deep-dive:**
 ```
-~/claude/casehub/parent/docs/repos/casehub-connectors.md
+../parent/docs/repos/casehub-connectors.md
 ```
 
 **Other repo deep-dives** (fetch the relevant ones when your implementation touches their domain):
-- casehub-ledger: `~/claude/casehub/parent/docs/repos/casehub-ledger.md`
-- casehub-work: `~/claude/casehub/parent/docs/repos/casehub-work.md`
-- casehub-qhorus: `~/claude/casehub/parent/docs/repos/casehub-qhorus.md`
-- casehub-engine: `~/claude/casehub/parent/docs/repos/casehub-engine.md`
-- claudony: `~/claude/casehub/parent/docs/repos/claudony.md`
+- casehub-ledger: `../parent/docs/repos/casehub-ledger.md`
+- casehub-work: `../parent/docs/repos/casehub-work.md`
+- casehub-qhorus: `../parent/docs/repos/casehub-qhorus.md`
+- casehub-engine: `../parent/docs/repos/casehub-engine.md`
+- claudony: `../parent/docs/repos/claudony.md`
 
 ---
 
