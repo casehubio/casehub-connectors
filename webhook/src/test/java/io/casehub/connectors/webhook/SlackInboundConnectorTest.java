@@ -55,7 +55,7 @@ class SlackInboundConnectorTest {
     private static String messageEvent(final String user, final String channel,
                                        final String text) {
         return """
-                {"type":"event_callback","event":{"type":"message","user":"%s","channel":"%s","text":"%s"}}
+                {"type":"event_callback","team_id":"T789","event":{"type":"message","user":"%s","channel":"%s","text":"%s"}}
                 """.formatted(user, channel, text).strip();
     }
 
@@ -191,6 +191,7 @@ class SlackInboundConnectorTest {
         assertThat(delivered.messages().get(0).externalChannelRef()).isEqualTo("C456");
         assertThat(delivered.messages().get(0).content()).isEqualTo("hello world");
         assertThat(delivered.messages().get(0).connectorId()).isEqualTo("slack-inbound");
+        assertThat(delivered.messages().get(0).metadata()).containsEntry("workspace-id", "T789");
     }
 
     @Test
@@ -203,6 +204,18 @@ class SlackInboundConnectorTest {
     void nonMessageEventType_returnsIgnored() {
         assertThat(connector.handle(postRequest(appMentionEvent())))
                 .isInstanceOf(WebhookResult.Ignored.class);
+    }
+
+    @Test
+    void messageEvent_noTeamId_metadataIsEmpty() {
+        // event_callback without team_id → metadata["workspace-id"] absent
+        final String body = """
+                {"type":"event_callback","event":{"type":"message","user":"U1","channel":"C1","text":"hi"}}
+                """.strip();
+        final WebhookResult result = connector.handle(postRequest(body));
+        assertThat(result).isInstanceOf(WebhookResult.Delivered.class);
+        final WebhookResult.Delivered delivered = (WebhookResult.Delivered) result;
+        assertThat(delivered.messages().get(0).metadata()).doesNotContainKey("workspace-id");
     }
 
     @Test

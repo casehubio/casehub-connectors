@@ -1,5 +1,6 @@
 package io.casehub.connectors.webhook;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -131,9 +132,17 @@ public class WebhookRouter {
                     Response.ok(responseBody).type(contentType).build();
                 case WebhookResult.Ignored() -> Response.ok().build();
                 case WebhookResult.Unauthorized() -> {
-                    LOG.warning("SECURITY: rejected webhook request for connector '" + id
-                            + "' — signature invalid or replay detected. method="
-                            + request.method() + " url=" + request.requestUrl());
+                    // Sanitize XFF — caller-controlled; strip anything that could corrupt log format
+                    final String rawXff = request.header("x-forwarded-for");
+                    final String sourceIp = (rawXff != null
+                            && rawXff.matches("[\\w.,: \\[\\]/-]{1,200}"))
+                            ? rawXff.split(",")[0].trim() : "unknown";
+                    LOG.warning("SECURITY: rejected webhook request."
+                            + " connector=" + id
+                            + " method=" + request.method()
+                            + " sourceIp=" + sourceIp
+                            + " timestamp=" + Instant.now()
+                            + " url=" + request.requestUrl());
                     yield request.method() == HttpMethod.GET
                             ? Response.status(Response.Status.FORBIDDEN).build()
                             : Response.ok().build();
