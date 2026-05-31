@@ -36,7 +36,7 @@ import io.casehub.connectors.InboundMessageSink;
  * (single-threaded, daemon). Each poll cycle opens a fresh {@link Session} and
  * {@link Store} — no reconnect logic, no persistent connection.
  *
- * <p>{@code connectorId} is always {@value #ID}. Per-account identity is in
+ * <p>{@code connectorId} is always {@code "email-inbound"} ({@link io.casehub.connectors.InboundConnectorIds#EMAIL}). Per-account identity is in
  * {@code InboundMessage.metadata["account-id"]}.
  *
  * <h2>Delivery guarantee</h2>
