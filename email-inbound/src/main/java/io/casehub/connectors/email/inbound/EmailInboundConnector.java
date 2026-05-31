@@ -47,7 +47,7 @@ import io.casehub.connectors.InboundMessageSink;
 @ApplicationScoped
 public class EmailInboundConnector implements InboundConnector {
 
-    static final String ID = "email-inbound";
+    public static final String ID = io.casehub.connectors.InboundConnectorIds.EMAIL;
 
     private static final Logger LOG = Logger.getLogger(EmailInboundConnector.class.getName());
 

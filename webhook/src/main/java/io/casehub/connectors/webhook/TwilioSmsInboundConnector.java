@@ -46,7 +46,7 @@ import io.casehub.connectors.WebhookResult;
 @ApplicationScoped
 public class TwilioSmsInboundConnector extends WebhookInboundConnector {
 
-    static final String ID = "twilio-sms-inbound";
+    public static final String ID = io.casehub.connectors.InboundConnectorIds.TWILIO_SMS;
 
     private static final Logger LOG = Logger.getLogger(TwilioSmsInboundConnector.class.getName());
 

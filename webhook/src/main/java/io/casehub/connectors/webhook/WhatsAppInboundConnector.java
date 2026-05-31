@@ -43,7 +43,7 @@ import io.casehub.connectors.WebhookResult;
 @ApplicationScoped
 public class WhatsAppInboundConnector extends WebhookInboundConnector {
 
-    static final String ID = "whatsapp-inbound";
+    public static final String ID = io.casehub.connectors.InboundConnectorIds.WHATSAPP;
 
     private static final Logger LOG = Logger.getLogger(WhatsAppInboundConnector.class.getName());
 
