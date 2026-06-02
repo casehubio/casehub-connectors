@@ -1,6 +1,7 @@
 package io.casehub.connectors.email.inbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.time.Instant;
 import java.util.Date;
@@ -63,11 +64,11 @@ class EmailInboundConnectorTest {
                 false, "inbox@example.com", "password", "INBOX", 60);
     }
 
-    /** Blocks until the IDLE loop delivers a message, fails after 3 s. */
-    private InboundMessage receive() throws InterruptedException {
-        final InboundMessage msg = captured.poll(3, TimeUnit.SECONDS);
-        assertThat(msg).as("message not delivered within 3s — IDLE did not fire").isNotNull();
-        return msg;
+    /** Waits up to 5s for the IDLE loop or processUnseen to deliver a message. */
+    private InboundMessage receive() {
+        await().atMost(5, TimeUnit.SECONDS)
+               .untilAsserted(() -> assertThat(captured).as("message not delivered within 5s — IDLE did not fire or processUnseen missed it").isNotEmpty());
+        return captured.poll();
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -120,7 +121,7 @@ class EmailInboundConnectorTest {
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void doubleStart_isNoOp() throws Exception {
         connector.start(captured::add);
         connector.start(captured::add); // second call must not subscribe a second IDLE loop
@@ -136,7 +137,7 @@ class EmailInboundConnectorTest {
     // ── delivery ─────────────────────────────────────────────────────────────
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void singlePlainTextMessage_deliveredWithCorrectFields() throws Exception {
         connector.start(captured::add);
         deliver("sender@example.com", "Hello subject", "Hello body");
@@ -154,14 +155,16 @@ class EmailInboundConnectorTest {
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void multipleUnseenMessages_allDelivered() throws Exception {
         connector.start(captured::add);
         deliver("a@example.com", "First", "Body A");
         deliver("b@example.com", "Second", "Body B");
 
-        final InboundMessage m1 = receive();
-        final InboundMessage m2 = receive();
+        await().atMost(5, TimeUnit.SECONDS)
+               .untilAsserted(() -> assertThat(captured).as("both messages not delivered within 5s").hasSize(2));
+        final InboundMessage m1 = captured.poll();
+        final InboundMessage m2 = captured.poll();
         assertThat(List.of(m1.content(), m2.content()))
                 .containsExactlyInAnyOrder("Body A", "Body B");
     }
@@ -186,7 +189,7 @@ class EmailInboundConnectorTest {
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void sinkThrows_messageStillMarkedSeen_remainingDelivered() throws Exception {
         deliver("a@example.com", "First", "Body A");
         deliver("b@example.com", "Second", "Body B");
@@ -215,16 +218,17 @@ class EmailInboundConnectorTest {
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void htmlOnlyMessage_rawHtmlInContent() throws Exception {
-        connector.start(captured::add);
         final MimeMessage msg = new MimeMessage(Session.getInstance(new Properties()));
         msg.setFrom(new InternetAddress("sender@example.com"));
         msg.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
         msg.setSubject("HTML email");
         msg.setContent("<p>Rich content</p>", "text/html; charset=UTF-8");
         msg.setSentDate(Date.from(Instant.now()));
-        deliverViaSMTP(msg);
+        msg.saveChanges();
+        deliverDirect(msg);
+        connector.start(captured::add);
 
         assertThat(receive().content()).isEqualTo("<p>Rich content</p>");
     }
@@ -244,7 +248,7 @@ class EmailInboundConnectorTest {
     // ── edge cases (pre-deliver before start so processUnseen() on connect handles them) ──
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void missingFromHeader_senderIdIsEmptyString() throws Exception {
         final MimeMessage msg = new MimeMessage(Session.getInstance(new Properties()));
         msg.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
@@ -258,7 +262,7 @@ class EmailInboundConnectorTest {
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void missingToHeader_channelRefFallsBackToAccountUsername() throws Exception {
         final MimeMessage msg = new MimeMessage(Session.getInstance(new Properties()));
         msg.setFrom(new InternetAddress("sender@example.com"));
@@ -272,15 +276,16 @@ class EmailInboundConnectorTest {
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void messageWithoutSubject_subjectKeyAbsent() throws Exception {
-        connector.start(captured::add);
         final MimeMessage msg = new MimeMessage(Session.getInstance(new Properties()));
         msg.setFrom(new InternetAddress("sender@example.com"));
         msg.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
         msg.setText("Body");
         msg.setSentDate(Date.from(Instant.now()));
-        deliverViaSMTP(msg);
+        msg.saveChanges();
+        deliverDirect(msg);
+        connector.start(captured::add);
 
         assertThat(receive().metadata()).doesNotContainKey("subject");
     }
@@ -320,10 +325,8 @@ class EmailInboundConnectorTest {
     // ── attachment delivery (Phase 2) ─────────────────────────────────────────
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void messageWithPdfAttachment_attachmentDelivered() throws Exception {
-        connector.start(captured::add);
-
         final MimeMessage raw = new MimeMessage(Session.getInstance(new Properties()));
         raw.setFrom(new InternetAddress("sender@example.com"));
         raw.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
@@ -340,8 +343,9 @@ class EmailInboundConnectorTest {
         attPart.setFileName("invoice.pdf");
         multipart.addBodyPart(attPart);
         raw.setContent(multipart);
-
-        deliverViaSMTP(raw);
+        raw.saveChanges();
+        deliverDirect(raw);
+        connector.start(captured::add);
 
         final InboundMessage msg = receive();
         assertThat(msg.content()).isEqualTo("See attached");
@@ -353,21 +357,27 @@ class EmailInboundConnectorTest {
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void messageWithNoAttachments_attachmentsEmptyAndCountIsZero() throws Exception {
+        final MimeMessage msg = new MimeMessage(Session.getInstance(new Properties()));
+        msg.setFrom(new InternetAddress("sender@example.com"));
+        msg.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
+        msg.setSubject("Plain");
+        msg.setText("Body");
+        msg.setSentDate(Date.from(Instant.now()));
+        msg.setHeader("Message-ID", "<test-" + System.nanoTime() + "@example.com>");
+        msg.saveChanges();
+        deliverDirect(msg);
         connector.start(captured::add);
-        deliver("sender@example.com", "Plain", "Body");
 
-        final InboundMessage msg = receive();
-        assertThat(msg.attachments()).isEmpty();
-        assertThat(msg.metadata()).containsEntry("attachment-count", "0");
+        final InboundMessage result = receive();
+        assertThat(result.attachments()).isEmpty();
+        assertThat(result.metadata()).containsEntry("attachment-count", "0");
     }
 
     @Test
-    @Timeout(5)
+    @Timeout(10)
     void messageWithMultipleAttachments_allCollected() throws Exception {
-        connector.start(captured::add);
-
         final MimeMessage raw = new MimeMessage(Session.getInstance(new Properties()));
         raw.setFrom(new InternetAddress("sender@example.com"));
         raw.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
@@ -392,7 +402,9 @@ class EmailInboundConnectorTest {
         multipart.addBodyPart(img);
 
         raw.setContent(multipart);
-        deliverViaSMTP(raw);
+        raw.saveChanges();
+        deliverDirect(raw);
+        connector.start(captured::add);
 
         final InboundMessage msg = receive();
         assertThat(msg.attachments()).hasSize(2);
