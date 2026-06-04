@@ -32,21 +32,37 @@ synchronous `Event<InboundMessage>`. Connectors deliver a message and return imm
 — they have no knowledge of what happens next. Observers own their dispatch strategy
 and must not block the CDI fire for longer than Slack's 3-second retry deadline.
 
+**MCP bridge on success only.** `ConnectorMeshBridge.notifyDelivered()` is called from
+MCP tools after a successful `ConnectorService.send()` — not from inside `ConnectorService`
+itself. CDI-only callers are already in a CaseHub context with full Qhorus observability;
+logging their deliveries again would be redundant. The bridge is an MCP-surface concern.
+
+**Content sanitization before bridge.** Bridge implementations receive content truncated to
+500 chars with all ASCII control characters (≤ 0x1F and DEL 0x7F) replaced with space —
+prevents log injection via ANSI escape sequences. Original body is passed to the underlying
+connector unchanged.
+
+**MCP tools never throw.** Tools catch `Exception` broadly and return `"Failed: <message>"`.
+Raw stack traces must not reach the LLM caller regardless of what the connector throws.
+
 ---
 
 ## Module Structure
 
 | Module | Artifact | Purpose |
 |--------|----------|---------|
-| `core` | `casehub-connectors-core` | Outbound SPI + Slack, Teams, Twilio SMS, WhatsApp; inbound SPIs + `InboundConnectorService` |
+| `core` | `casehub-connectors-core` | Outbound SPI + Slack, Teams, Twilio SMS, WhatsApp; inbound SPIs + `InboundConnectorService`; `ConnectorMeshBridge` SPI |
 | `webhook` | `casehub-connectors-webhook` | Webhook inbound connectors (Slack, Teams, WhatsApp, Twilio SMS) + `WebhookRouter` JAX-RS |
 | `email` | `casehub-connectors-email` | Email outbound via `quarkus-mailer` |
 | `email-inbound` | `casehub-connectors-email-inbound` | Email inbound via IMAP IDLE (`EmailInboundConnector`) + `EmailInboundAccountProvider` SPI |
+| `mcp` | `casehub-connectors-mcp` | MCP tool surface — `send_slack`, `send_teams`, `send_sms`, `send_whatsapp`, `send_email` tools for LLM agents; depends on `core` + `email` + `quarkus-mcp-server-core`. Consuming apps add `quarkus-mcp-server-http` for transport. |
 
 Each module carries only the dependencies it needs. `email` and `email-inbound` are
 separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) have no shared
 infrastructure — bundling them would force each dependency on users who need only one.
 `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments.
+`mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM and adds
+no value to deployments that expose connectors via CDI only.
 
 ---
 
@@ -69,6 +85,25 @@ Callers use this to select the right connector at runtime.
 
 **Custom connectors:** implement `Connector` as an `@ApplicationScoped` CDI bean.
 It will be discovered automatically alongside the built-in implementations.
+
+### `ConnectorMeshBridge` SPI
+
+```java
+public interface ConnectorMeshBridge {
+    void notifyDelivered(String connectorId, String destination, String content);
+}
+```
+
+Called by MCP tools after successful `ConnectorService.send()`. The no-op `@DefaultBean
+@Unremovable` default ships with `core`. When `qhorus/connector-backend` is on the classpath,
+its implementation activates by classpath presence and posts an `EVENT` to the active Qhorus
+observe channel (tracked in qhorus#249).
+
+`@Unremovable` is required because the injection point lives in the `mcp` module, not in `core` —
+ARC would otherwise eliminate the bean at augmentation time when `core` is used standalone.
+
+**SPI contract:** must return quickly (no blocking I/O on calling thread); must tolerate absent
+case context without throwing; must never throw; `null` content is permitted and treated as empty.
 
 ---
 
@@ -285,3 +320,19 @@ Use `ids()` to enumerate available channels (e.g. for UI validation or capabilit
 ```java
 Set<String> available = connectors.ids();
 ```
+
+### MCP tool surface
+
+Add `casehub-connectors-mcp` to expose five tools to LLM agents:
+
+| Tool | Parameters | Connector |
+|------|-----------|-----------|
+| `send_slack` | `webhookUrl`, `title`, `body` | `SlackConnector` |
+| `send_teams` | `webhookUrl`, `title`, `body` | `TeamsConnector` |
+| `send_sms` | `to` (E.164), `body` | `TwilioSmsConnector` |
+| `send_whatsapp` | `to` (E.164), `body`, `templateName`?, `templateLanguage`? | `WhatsAppConnector` |
+| `send_email` | `to`, `subject`, `body` | `EmailConnector` |
+
+Each tool returns `"Dispatched to <destination>"` on success (`send()` is void; dispatch,
+not confirmed delivery) or `"Failed: <reason>"` on error. Consuming apps add
+`quarkus-mcp-server-http` for the transport.
