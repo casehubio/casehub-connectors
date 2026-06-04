@@ -26,10 +26,12 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
     <module>webhook</module>
     <module>email</module>
     <module>email-inbound</module>
+    <module>mcp</module>
   </modules>
 
   <properties>
     <quarkus.version>3.32.2</quarkus.version>
+    <quarkus-mcp-server.version>1.11.1</quarkus-mcp-server.version>
     <maven.compiler.release>21</maven.compiler.release>
   </properties>
 
