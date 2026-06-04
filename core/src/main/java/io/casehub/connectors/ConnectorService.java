@@ -27,7 +27,7 @@ public class ConnectorService {
 
     private final Map<String, Connector> registry;
 
-    ConnectorService(@All final List<Connector> connectors) {
+    public ConnectorService(@All final List<Connector> connectors) {
         this.registry = connectors.stream()
                 .collect(Collectors.toMap(
                         Connector::id,
