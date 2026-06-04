@@ -9,14 +9,16 @@ final class McpContentSanitizer {
 
     /**
      * Strips control characters that enable log injection and truncates to 500 chars.
-     * Newlines, carriage returns, and tabs are replaced with spaces.
+     * All ASCII control characters (0x00–0x1F and DEL 0x7F) are replaced with spaces,
+     * covering ESC/ANSI injection, NUL log-truncation, and newline injection in one pass.
      */
     static String sanitize(final String content) {
         if (content == null) return "";
-        final String stripped = content
-                .replace('\n', ' ')
-                .replace('\r', ' ')
-                .replace('\t', ' ');
-        return stripped.length() > MAX_LENGTH ? stripped.substring(0, MAX_LENGTH) : stripped;
+        final StringBuilder sb = new StringBuilder(Math.min(content.length(), MAX_LENGTH));
+        for (int i = 0; i < content.length() && sb.length() < MAX_LENGTH; i++) {
+            final char c = content.charAt(i);
+            sb.append((c < 0x20 || c == 0x7F) ? ' ' : c);
+        }
+        return sb.toString();
     }
 }
