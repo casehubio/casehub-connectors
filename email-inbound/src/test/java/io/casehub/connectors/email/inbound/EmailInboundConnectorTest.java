@@ -139,19 +139,27 @@ class EmailInboundConnectorTest {
     @Test
     @Timeout(10)
     void singlePlainTextMessage_deliveredWithCorrectFields() throws Exception {
+        final MimeMessage msg = new MimeMessage(Session.getInstance(new Properties()));
+        msg.setFrom(new InternetAddress("sender@example.com"));
+        msg.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
+        msg.setSubject("Hello subject");
+        msg.setText("Hello body");
+        msg.setSentDate(Date.from(Instant.now()));
+        msg.setHeader("Message-ID", "<test-" + System.nanoTime() + "@example.com>");
+        msg.saveChanges();
+        deliverDirect(msg);
         connector.start(captured::add);
-        deliver("sender@example.com", "Hello subject", "Hello body");
 
-        final InboundMessage msg = receive();
-        assertThat(msg.connectorId()).isEqualTo("email-inbound");
-        assertThat(msg.externalSenderId()).isEqualTo("sender@example.com");
-        assertThat(msg.externalChannelRef()).isEqualTo("inbox@example.com");
-        assertThat(msg.content()).isEqualTo("Hello body");
-        assertThat(msg.receivedAt()).isNotNull();
-        assertThat(msg.metadata()).containsEntry("account-id", "email-inbound");
-        assertThat(msg.metadata()).containsEntry("subject", "Hello subject");
-        assertThat(msg.metadata()).containsKey("message-id");
-        assertThat(msg.metadata()).containsEntry("attachment-count", "0");
+        final InboundMessage result = receive();
+        assertThat(result.connectorId()).isEqualTo("email-inbound");
+        assertThat(result.externalSenderId()).isEqualTo("sender@example.com");
+        assertThat(result.externalChannelRef()).isEqualTo("inbox@example.com");
+        assertThat(result.content()).isEqualTo("Hello body");
+        assertThat(result.receivedAt()).isNotNull();
+        assertThat(result.metadata()).containsEntry("account-id", "email-inbound");
+        assertThat(result.metadata()).containsEntry("subject", "Hello subject");
+        assertThat(result.metadata()).containsKey("message-id");
+        assertThat(result.metadata()).containsEntry("attachment-count", "0");
     }
 
     @Test
