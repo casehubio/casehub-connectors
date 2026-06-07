@@ -51,6 +51,12 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
         <version>3.26.3</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>org.wiremock</groupId>
+        <artifactId>wiremock-standalone</artifactId>
+        <version>3.9.1</version>
+        <scope>test</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 

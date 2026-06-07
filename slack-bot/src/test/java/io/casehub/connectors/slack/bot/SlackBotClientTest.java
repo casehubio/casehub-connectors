@@ -137,6 +137,28 @@ class SlackBotClientTest {
     }
 
     @Test
+    void postMessage_429WithoutRetryAfter_sleepsOneSecondAndRetries() {
+        wireMock.stubFor(post(urlEqualTo("/api/chat.postMessage"))
+                .inScenario("rate-limit-no-header")
+                .whenScenarioStateIs(STARTED)
+                .willReturn(aResponse()
+                        .withStatus(429)
+                        .withBody("{\"ok\":false,\"error\":\"ratelimited\"}"))
+                .willSetStateTo("retried"));
+
+        wireMock.stubFor(post(urlEqualTo("/api/chat.postMessage"))
+                .inScenario("rate-limit-no-header")
+                .whenScenarioStateIs("retried")
+                .willReturn(okJson("{\"ok\":true,\"ts\":\"1638535627.000200\"}")));
+
+        final SlackBotClient.PostResult result =
+                client.postMessage("xoxb-test-token", "C123ABC", "Hello", null);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(2, postRequestedFor(urlEqualTo("/api/chat.postMessage")));
+    }
+
+    @Test
     void postMessage_429ThenAnotherError_returnsSecondResult() {
         wireMock.stubFor(post(urlEqualTo("/api/chat.postMessage"))
                 .inScenario("rate-limit-fail")
