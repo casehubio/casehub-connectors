@@ -27,6 +27,7 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
     <module>email</module>
     <module>email-inbound</module>
     <module>mcp</module>
+    <module>slack-bot</module>
   </modules>
 
   <properties>

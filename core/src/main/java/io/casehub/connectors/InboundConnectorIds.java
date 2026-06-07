@@ -10,6 +10,7 @@ package io.casehub.connectors;
  */
 public final class InboundConnectorIds {
 
+    public static final String SLACK_INBOUND = "slack-inbound";
     public static final String TWILIO_SMS = "twilio-sms-inbound";
     public static final String WHATSAPP = "whatsapp-inbound";
     public static final String EMAIL = "email-inbound";

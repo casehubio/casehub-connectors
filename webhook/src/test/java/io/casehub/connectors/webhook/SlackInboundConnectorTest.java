@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.casehub.connectors.HttpMethod;
+import io.casehub.connectors.InboundConnectorIds;
 import io.casehub.connectors.WebhookRequest;
 import io.casehub.connectors.WebhookResult;
 
@@ -57,6 +58,21 @@ class SlackInboundConnectorTest {
         return """
                 {"type":"event_callback","team_id":"T789","event":{"type":"message","user":"%s","channel":"%s","text":"%s"}}
                 """.formatted(user, channel, text).strip();
+    }
+
+    private static String messageEventWithTs(final String user, final String channel,
+                                             final String text, final String ts) {
+        return """
+                {"type":"event_callback","team_id":"T789","event":{"type":"message","user":"%s","channel":"%s","text":"%s","ts":"%s"}}
+                """.formatted(user, channel, text, ts).strip();
+    }
+
+    private static String messageEventWithThreadTs(final String user, final String channel,
+                                                   final String text, final String ts,
+                                                   final String threadTs) {
+        return """
+                {"type":"event_callback","team_id":"T789","event":{"type":"message","user":"%s","channel":"%s","text":"%s","ts":"%s","thread_ts":"%s"}}
+                """.formatted(user, channel, text, ts, threadTs).strip();
     }
 
     private static String urlVerification(final String challenge) {
@@ -221,5 +237,44 @@ class SlackInboundConnectorTest {
     @Test
     void id_isSlackInbound() {
         assertThat(connector.id()).isEqualTo("slack-inbound");
+    }
+
+    @Test
+    void id_matchesInboundConnectorIdsConstant() {
+        assertThat(connector.id()).isEqualTo(InboundConnectorIds.SLACK_INBOUND);
+    }
+
+    // ── Slack timestamp metadata ──────────────────────────────────────────────
+
+    @Test
+    void messageWithTs_slackTsInMetadata() {
+        final WebhookResult result = connector.handle(
+                postRequest(messageEventWithTs("U1", "C1", "hi", "1638535627.000200")));
+
+        assertThat(result).isInstanceOf(WebhookResult.Delivered.class);
+        assertThat(((WebhookResult.Delivered) result).messages().get(0).metadata())
+                .containsEntry("slack-ts", "1638535627.000200");
+    }
+
+    @Test
+    void messageWithThreadTs_slackThreadTsInMetadata() {
+        final String body = messageEventWithThreadTs(
+                "U1", "C1", "reply", "1638535627.000200", "1638535600.000100");
+        final WebhookResult result = connector.handle(postRequest(body));
+
+        assertThat(result).isInstanceOf(WebhookResult.Delivered.class);
+        final var msg = ((WebhookResult.Delivered) result).messages().get(0);
+        assertThat(msg.metadata()).containsEntry("slack-ts", "1638535627.000200");
+        assertThat(msg.metadata()).containsEntry("slack-thread-ts", "1638535600.000100");
+    }
+
+    @Test
+    void messageWithoutThreadTs_slackThreadTsAbsent() {
+        final WebhookResult result = connector.handle(
+                postRequest(messageEventWithTs("U1", "C1", "hi", "1638535627.000200")));
+
+        assertThat(result).isInstanceOf(WebhookResult.Delivered.class);
+        assertThat(((WebhookResult.Delivered) result).messages().get(0).metadata())
+                .doesNotContainKey("slack-thread-ts");
     }
 }

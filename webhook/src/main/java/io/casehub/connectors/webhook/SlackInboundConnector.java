@@ -4,6 +4,7 @@ import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,7 @@ import jakarta.json.JsonObject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.casehub.connectors.HttpMethod;
+import io.casehub.connectors.InboundConnectorIds;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.WebhookInboundConnector;
 import io.casehub.connectors.WebhookRequest;
@@ -42,7 +44,7 @@ import io.casehub.connectors.WebhookResult;
 @ApplicationScoped
 public class SlackInboundConnector extends WebhookInboundConnector {
 
-    static final String ID = "slack-inbound";
+    public static final String ID = InboundConnectorIds.SLACK_INBOUND;
 
     private static final Logger LOG = Logger.getLogger(SlackInboundConnector.class.getName());
     private static final long REPLAY_WINDOW_SECONDS = 300; // 5 minutes
@@ -152,9 +154,15 @@ public class SlackInboundConnector extends WebhookInboundConnector {
 
             if (user == null || channel == null) return messages;
 
-            final String teamId = json.getString("team_id", null);
-            final Map<String, String> meta = teamId != null
-                    ? Map.of("workspace-id", teamId) : Map.of();
+            final String teamId   = json.getString("team_id", null);
+            final String slackTs  = event.getString("ts", null);
+            final String threadTs = event.getString("thread_ts", null);
+
+            final Map<String, String> meta = new HashMap<>();
+            if (teamId   != null) meta.put("workspace-id",   teamId);
+            if (slackTs  != null) meta.put("slack-ts",       slackTs);
+            if (threadTs != null) meta.put("slack-thread-ts", threadTs);
+
             messages.add(new InboundMessage(ID, user, channel, text, Instant.now(), meta));
         } catch (final Exception e) {
             LOG.warning("slack-inbound: failed to parse event body: " + e.getMessage());
