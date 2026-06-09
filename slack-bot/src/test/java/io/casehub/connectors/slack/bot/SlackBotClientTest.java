@@ -13,7 +13,12 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import io.casehub.connectors.DiscoveredTarget;
 
@@ -229,5 +234,57 @@ class SlackBotClientTest {
         final List<DiscoveredTarget> result = client.listChannels("xoxb-bad");
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void listChannels_responseIsTruncated_logsWarning() {
+        wireMock.stubFor(get(urlEqualTo(
+                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C123ABC\",\"name\":\"general\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"dXNlcjpVMEc5V0ZYNlo=\"}}")));
+
+        final List<LogRecord> warnings = captureWarnings(() -> client.listChannels("xoxb-test-token"));
+
+        assertThat(warnings).anyMatch(r -> r.getMessage().contains("truncated"));
+    }
+
+    @Test
+    void listChannels_responseIsNotTruncated_noWarningLogged() {
+        wireMock.stubFor(get(urlEqualTo(
+                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C123ABC\",\"name\":\"general\"}"
+                        + "]}")));
+
+        final List<LogRecord> warnings = captureWarnings(() -> client.listChannels("xoxb-test-token"));
+
+        assertThat(warnings).noneMatch(r -> r.getMessage().contains("truncated"));
+    }
+
+    @Test
+    void listChannels_responseMetaPresentButNoCursor_noWarningLogged() {
+        wireMock.stubFor(get(urlEqualTo(
+                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C123ABC\",\"name\":\"general\"}"
+                        + "],\"response_metadata\":{}}")));
+
+        final List<LogRecord> warnings = captureWarnings(() -> client.listChannels("xoxb-test-token"));
+
+        assertThat(warnings).noneMatch(r -> r.getMessage().contains("truncated"));
+    }
+
+    private List<LogRecord> captureWarnings(final Runnable action) {
+        final Logger logger = Logger.getLogger(SlackBotClient.class.getName());
+        final List<LogRecord> records = new ArrayList<>();
+        final Handler handler = new Handler() {
+            @Override public void publish(final LogRecord r) { if (r.getLevel() == Level.WARNING) records.add(r); }
+            @Override public void flush() {}
+            @Override public void close() {}
+        };
+        logger.addHandler(handler);
+        try { action.run(); } finally { logger.removeHandler(handler); }
+        return records;
     }
 }

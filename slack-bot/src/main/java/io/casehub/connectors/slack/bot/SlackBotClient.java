@@ -102,6 +102,14 @@ public class SlackBotClient {
         try (var reader = Json.createReader(new StringReader(body))) {
             final JsonObject obj = reader.readObject();
             if (!obj.getBoolean("ok", false)) return List.of();
+            if (obj.containsKey("response_metadata")) {
+                final String cursor = obj.getJsonObject("response_metadata")
+                        .getString("next_cursor", "");
+                if (!cursor.isBlank()) {
+                    LOG.warning("SlackBotClient: listChannels truncated — workspace has >200 channels."
+                            + " Pagination not yet supported.");
+                }
+            }
             return obj.getJsonArray("channels").stream()
                     .map(v -> v.asJsonObject())
                     .map(ch -> new DiscoveredTarget(
