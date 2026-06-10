@@ -10,11 +10,13 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -237,16 +239,149 @@ class SlackBotClientTest {
     }
 
     @Test
-    void listChannels_responseIsTruncated_logsWarning() {
-        wireMock.stubFor(get(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+    void listChannels_twoPagesWithCursor_returnsBothPages() {
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page2Url = page1Url + "&cursor=cursor-page2";
+
+        wireMock.stubFor(get(urlEqualTo(page1Url))
                 .willReturn(okJson("{\"ok\":true,\"channels\":["
-                        + "{\"id\":\"C123ABC\",\"name\":\"general\"}"
-                        + "],\"response_metadata\":{\"next_cursor\":\"dXNlcjpVMEc5V0ZYNlo=\"}}")));
+                        + "{\"id\":\"C001\",\"name\":\"general\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"cursor-page2\"}}")));
+        wireMock.stubFor(get(urlEqualTo(page2Url))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C002\",\"name\":\"engineering\"}"
+                        + "]}")));
+
+        final List<DiscoveredTarget> result = client.listChannels("xoxb-test-token");
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(DiscoveredTarget::id).containsExactly("C001", "C002");
+    }
+
+    @Test
+    void listChannels_threePagesWithCursor_returnsAllPages() {
+        final String base = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+
+        wireMock.stubFor(get(urlEqualTo(base))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C001\",\"name\":\"alpha\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"c2\"}}")));
+        wireMock.stubFor(get(urlEqualTo(base + "&cursor=c2"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C002\",\"name\":\"beta\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"c3\"}}")));
+        wireMock.stubFor(get(urlEqualTo(base + "&cursor=c3"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C003\",\"name\":\"gamma\"}"
+                        + "]}")));
+
+        final List<DiscoveredTarget> result = client.listChannels("xoxb-test-token");
+
+        assertThat(result).hasSize(3);
+        assertThat(result).extracting(DiscoveredTarget::id).containsExactly("C001", "C002", "C003");
+    }
+
+    @Test
+    void listChannels_cursorPresentInUrl_onlyOnSubsequentRequests() {
+        // Use a realistic Slack cursor with '=' padding to verify URLEncoder.encode() is applied.
+        // Without encoding, the client sends &cursor=dXNlcjpVMEc5V0ZYNlo= (stub won't match).
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String rawCursor = "dXNlcjpVMEc5V0ZYNlo=";
+        final String encodedCursor = "dXNlcjpVMEc5V0ZYNlo%3D";
+        final String page2Url = page1Url + "&cursor=" + encodedCursor;
+
+        wireMock.stubFor(get(urlEqualTo(page1Url))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C001\",\"name\":\"general\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"" + rawCursor + "\"}}")));
+        wireMock.stubFor(get(urlEqualTo(page2Url))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C002\",\"name\":\"random\"}"
+                        + "]}")));
+
+        client.listChannels("xoxb-test-token");
+
+        wireMock.verify(1, getRequestedFor(urlEqualTo(page1Url)));
+        wireMock.verify(1, getRequestedFor(urlEqualTo(page2Url)));
+    }
+
+    @Test
+    void listChannels_withCursor_paginatesWithoutWarning() {
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page2Url = page1Url + "&cursor=page2-cursor";
+
+        wireMock.stubFor(get(urlEqualTo(page1Url))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C001\",\"name\":\"general\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"page2-cursor\"}}")));
+        wireMock.stubFor(get(urlEqualTo(page2Url))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C002\",\"name\":\"random\"}"
+                        + "]}")));
 
         final List<LogRecord> warnings = captureWarnings(() -> client.listChannels("xoxb-test-token"));
 
-        assertThat(warnings).anyMatch(r -> r.getMessage().contains("truncated"));
+        wireMock.verify(2, getRequestedFor(urlMatching("/api/conversations.list.*")));
+        assertThat(warnings).isEmpty();
+    }
+
+    @Test
+    void listChannels_midLoopApiError_returnsPartialWithWarning() {
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page2Url = page1Url + "&cursor=next-cursor";
+
+        wireMock.stubFor(get(urlEqualTo(page1Url))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C001\",\"name\":\"general\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"next-cursor\"}}")));
+        wireMock.stubFor(get(urlEqualTo(page2Url))
+                .willReturn(okJson("{\"ok\":false,\"error\":\"api_error\"}")));
+
+        final AtomicReference<List<DiscoveredTarget>> result = new AtomicReference<>();
+        final List<LogRecord> warnings = captureWarnings(
+                () -> result.set(client.listChannels("xoxb-test-token")));
+
+        wireMock.verify(1, getRequestedFor(urlEqualTo(page2Url)));
+        assertThat(result.get()).hasSize(1);
+        assertThat(result.get().get(0).id()).isEqualTo("C001");
+        assertThat(warnings).anyMatch(r -> r.getMessage().contains("api_error"));
+    }
+
+    @Test
+    void listChannels_midLoopRateLimited_returnsPartialWithRatelimitedWarning() {
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page2Url = page1Url + "&cursor=next-cursor";
+
+        wireMock.stubFor(get(urlEqualTo(page1Url))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C001\",\"name\":\"general\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"next-cursor\"}}")));
+        wireMock.stubFor(get(urlEqualTo(page2Url))
+                .willReturn(okJson("{\"ok\":false,\"error\":\"ratelimited\"}")));
+
+        final AtomicReference<List<DiscoveredTarget>> result = new AtomicReference<>();
+        final List<LogRecord> warnings = captureWarnings(
+                () -> result.set(client.listChannels("xoxb-test-token")));
+
+        wireMock.verify(1, getRequestedFor(urlEqualTo(page2Url)));
+        assertThat(result.get()).hasSize(1);
+        assertThat(warnings).anyMatch(r -> r.getMessage().contains("ratelimited"));
+    }
+
+    @Test
+    void listChannels_pageCapReached_returnsAccumulatedWithWarning() {
+        wireMock.stubFor(get(urlMatching("/api/conversations.list.*"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":["
+                        + "{\"id\":\"C001\",\"name\":\"cap-test\"}"
+                        + "],\"response_metadata\":{\"next_cursor\":\"always-cursor\"}}")));
+
+        final AtomicReference<List<DiscoveredTarget>> result = new AtomicReference<>();
+        final List<LogRecord> warnings = captureWarnings(
+                () -> result.set(client.listChannels("xoxb-token")));
+
+        wireMock.verify(50, getRequestedFor(urlMatching("/api/conversations.list.*")));
+        assertThat(result.get()).hasSize(50);
+        assertThat(warnings).anyMatch(r -> r.getMessage().contains("capped"));
     }
 
     @Test
@@ -259,7 +394,7 @@ class SlackBotClientTest {
 
         final List<LogRecord> warnings = captureWarnings(() -> client.listChannels("xoxb-test-token"));
 
-        assertThat(warnings).noneMatch(r -> r.getMessage().contains("truncated"));
+        assertThat(warnings).isEmpty();
     }
 
     @Test
@@ -272,7 +407,7 @@ class SlackBotClientTest {
 
         final List<LogRecord> warnings = captureWarnings(() -> client.listChannels("xoxb-test-token"));
 
-        assertThat(warnings).noneMatch(r -> r.getMessage().contains("truncated"));
+        assertThat(warnings).isEmpty();
     }
 
     private List<LogRecord> captureWarnings(final Runnable action) {
