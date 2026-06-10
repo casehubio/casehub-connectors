@@ -9,3 +9,4 @@ Rules specific to the casehub-connectors repo.
 | [spi-id-method-naming.md](spi-id-method-naming.md) | SPI identifier methods are named `id()`, not `connectorId()` or `typeId()` | Any new SPI interface added to core |
 | [mcp-tool-blocking-annotation.md](mcp-tool-blocking-annotation.md) | `@Blocking` required on every `@Tool` method calling blocking HTTP | casehub-connectors-mcp, all `@Tool` methods |
 | [credential-config-ownership.md](credential-config-ownership.md) | Credential config properties belong to callers, not shared HTTP clients | Shared HTTP clients used by multiple consumers |
+| [paginating-client-fail-soft.md](paginating-client-fail-soft.md) | Paginating HTTP methods return partial results + WARNING on mid-loop failure, never empty list | Any method issuing multiple HTTP requests to enumerate a paginated resource |
