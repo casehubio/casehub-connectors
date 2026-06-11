@@ -1,6 +1,5 @@
 # connectors Workspace
-**Name:** connectors
-
+**Name:** casehub-connectors
 **Project repo:** /Users/mdproctor/claude/casehub/connectors
 **Workspace type:** public
 
