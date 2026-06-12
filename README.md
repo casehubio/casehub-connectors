@@ -1,5 +1,7 @@
 # casehub-connectors
 
+[![Build](https://github.com/casehubio/connectors/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/casehubio/connectors/actions/workflows/publish.yml) [![Open PRs](https://img.shields.io/github/issues-pr/casehubio/connectors)](https://github.com/casehubio/connectors/pulls)
+
 Lightweight outbound message connectors for the [CaseHub](https://github.com/casehubio) platform.
 
 Provides a unified `Connector` SPI with built-in implementations for:
