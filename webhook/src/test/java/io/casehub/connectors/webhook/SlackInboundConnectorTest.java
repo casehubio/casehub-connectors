@@ -277,4 +277,21 @@ class SlackInboundConnectorTest {
         assertThat(((WebhookResult.Delivered) result).messages().get(0).metadata())
                 .doesNotContainKey("slack-thread-ts");
     }
+
+    // ── Subtype filtering ─────────────────────────────────────────────────────
+
+    @Test
+    void messageChangedSubtype_isFiltered() {
+        // message_changed events have type=message + subtype=message_changed.
+        // Some forms (e.g. channel_join) carry user+channel at the event level,
+        // so the existing user/channel null-guard is not sufficient — subtype must
+        // be rejected explicitly.
+        final String body = """
+                {"type":"event_callback","team_id":"T123","event":{\
+                "type":"message","subtype":"channel_join",\
+                "user":"U1","channel":"C1","text":"<@U1> has joined the channel"}}""";
+
+        assertThat(connector.handle(postRequest(body)))
+                .isInstanceOf(WebhookResult.Ignored.class);
+    }
 }

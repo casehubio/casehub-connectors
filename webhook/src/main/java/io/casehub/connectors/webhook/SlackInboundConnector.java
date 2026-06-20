@@ -147,6 +147,7 @@ public class SlackInboundConnector extends WebhookInboundConnector {
             if (event == null) return messages;
             if (event.containsKey("bot_id")) return messages; // filter bot messages
             if (!"message".equals(event.getString("type", null))) return messages;
+            if (event.getString("subtype", null) != null) return messages; // filter edited/deleted/join etc.
 
             final String user = event.getString("user", null);
             final String channel = event.getString("channel", null);
