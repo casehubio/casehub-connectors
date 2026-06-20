@@ -33,7 +33,8 @@ import io.casehub.connectors.WebhookResult;
  * <li>Blank-secret guard → {@link WebhookResult.Ignored}
  * <li>Replay prevention — reject if {@code x-slack-request-timestamp} is &gt; 5 minutes old
  * <li>HMAC-SHA256 signature verification
- * <li>Message parsing and bot-message filtering
+ * <li>Message parsing, bot-message filtering, and subtype filtering
+ *     (message_changed, message_deleted, channel_join, etc.)
  * </ol>
  *
  * <h2>Signature</h2>
