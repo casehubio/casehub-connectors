@@ -11,14 +11,14 @@ class DefaultEmailInboundAccountProviderTest {
     @Test
     void blankHost_returnsEmptyList() {
         final DefaultEmailInboundAccountProvider provider =
-                new DefaultEmailInboundAccountProvider("", 993, true, "user", "pass", "INBOX", 60);
+                new DefaultEmailInboundAccountProvider("", 993, true, "user", "pass", "INBOX", 60, null);
         assertThat(provider.accounts()).isEmpty();
     }
 
     @Test
     void nullHost_returnsEmptyList() {
         final DefaultEmailInboundAccountProvider provider =
-                new DefaultEmailInboundAccountProvider(null, 993, true, "user", "pass", "INBOX", 60);
+                new DefaultEmailInboundAccountProvider(null, 993, true, "user", "pass", "INBOX", 60, null);
         assertThat(provider.accounts()).isEmpty();
     }
 
@@ -27,7 +27,7 @@ class DefaultEmailInboundAccountProviderTest {
         final DefaultEmailInboundAccountProvider provider =
                 new DefaultEmailInboundAccountProvider(
                         "imap.example.com", 993, true, "user@example.com",
-                        "secret", "INBOX", 60);
+                        "secret", "INBOX", 60, null);
 
         final List<EmailInboundAccount> accounts = provider.accounts();
         assertThat(accounts).hasSize(1);
@@ -41,15 +41,33 @@ class DefaultEmailInboundAccountProviderTest {
         assertThat(account.password()).isEqualTo("secret");
         assertThat(account.folder()).isEqualTo("INBOX");
         assertThat(account.reconnectDelaySeconds()).isEqualTo(60);
+        assertThat(account.tenancyId()).isNull();
     }
 
     @Test
     void customFolder_preservedInAccount() {
         final DefaultEmailInboundAccountProvider provider =
                 new DefaultEmailInboundAccountProvider(
-                        "imap.example.com", 143, false, "user", "pass", "Support", 30);
+                        "imap.example.com", 143, false, "user", "pass", "Support", 30, null);
         assertThat(provider.accounts().get(0).folder()).isEqualTo("Support");
         assertThat(provider.accounts().get(0).tls()).isFalse();
         assertThat(provider.accounts().get(0).reconnectDelaySeconds()).isEqualTo(30);
+        assertThat(provider.accounts().get(0).tenancyId()).isNull();
+    }
+
+    @Test
+    void nonNullTenancyId_preservedInAccount() {
+        final DefaultEmailInboundAccountProvider provider =
+                new DefaultEmailInboundAccountProvider(
+                        "imap.example.com", 993, true, "user", "pass", "INBOX", 60, "tenant-123");
+        assertThat(provider.accounts().get(0).tenancyId()).isEqualTo("tenant-123");
+    }
+
+    @Test
+    void blankTenancyId_convertedToNull() {
+        final DefaultEmailInboundAccountProvider provider =
+                new DefaultEmailInboundAccountProvider(
+                        "imap.example.com", 993, true, "user", "pass", "INBOX", 60, "  ");
+        assertThat(provider.accounts().get(0).tenancyId()).isNull();
     }
 }

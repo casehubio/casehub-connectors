@@ -18,6 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.casehub.connectors.HttpMethod;
 import io.casehub.connectors.InboundConnectorIds;
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.WebhookInboundConnector;
 import io.casehub.connectors.WebhookRequest;
@@ -109,7 +110,7 @@ public class SlackInboundConnector extends WebhookInboundConnector {
         }
 
         // 5. Parse and filter
-        final List<InboundMessage> messages = parseMessages(request.body());
+        final List<InboundMessage> messages = parseMessages(request.body(), request.tenancyId());
         return messages.isEmpty()
                 ? new WebhookResult.Ignored()
                 : new WebhookResult.Delivered(messages);
@@ -138,7 +139,7 @@ public class SlackInboundConnector extends WebhookInboundConnector {
         return SigHelper.constantTimeEquals(expected, sigHeader.getBytes(StandardCharsets.UTF_8));
     }
 
-    private List<InboundMessage> parseMessages(final String body) {
+    private List<InboundMessage> parseMessages(final String body, final String tenancyId) {
         final List<InboundMessage> messages = new ArrayList<>();
         try {
             final JsonObject json = Json.createReader(new StringReader(body)).readObject();
@@ -165,7 +166,8 @@ public class SlackInboundConnector extends WebhookInboundConnector {
             if (slackTs  != null) meta.put("slack-ts",       slackTs);
             if (threadTs != null) meta.put("slack-thread-ts", threadTs);
 
-            messages.add(new InboundMessage(ID, user, channel, text, Instant.now(), meta));
+            messages.add(new InboundMessage(ID, InboundConnectorTypes.SLACK,
+                    user, channel, text, List.of(), Instant.now(), meta, tenancyId));
         } catch (final Exception e) {
             LOG.warning("slack-inbound: failed to parse event body: " + e.getMessage());
         }

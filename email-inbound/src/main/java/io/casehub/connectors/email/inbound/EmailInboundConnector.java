@@ -30,6 +30,7 @@ import jakarta.mail.search.FlagTerm;
 import org.eclipse.angus.mail.imap.IMAPFolder;
 
 import io.casehub.connectors.InboundConnector;
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.InboundMessageSink;
 
@@ -207,16 +208,20 @@ public class EmailInboundConnector implements InboundConnector {
             final ExtractionResult extracted = ContentExtractor.extract(msg);
             return new InboundMessage(
                     ID,
+                    InboundConnectorTypes.EMAIL,
                     extractSenderId(msg),
                     extractChannelRef(msg, account),
                     extracted.content(),
                     extracted.attachments(),
                     resolveReceivedAt(msg),
-                    buildMetadata(account, msg, extracted.attachments().size()));
+                    buildMetadata(account, msg, extracted.attachments().size()),
+                    account.tenancyId());
         } catch (final Exception e) {
             LOG.log(Level.WARNING, "email-inbound: message parse failed", e);
-            return new InboundMessage(ID, "", account.username(), "",
-                    Instant.now(), Map.of("account-id", account.id()));
+            return new InboundMessage(ID, InboundConnectorTypes.EMAIL,
+                    "", account.username(), "",
+                    List.of(), Instant.now(), Map.of("account-id", account.id()),
+                    account.tenancyId());
         }
     }
 

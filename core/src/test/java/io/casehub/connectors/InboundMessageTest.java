@@ -1,6 +1,7 @@
 package io.casehub.connectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -12,46 +13,50 @@ import org.junit.jupiter.api.Test;
 class InboundMessageTest {
 
     @Test
-    void sevenArgConstructor_allFieldsSet() {
+    void canonicalConstructor_allFieldsSet() {
         final List<Attachment> atts = List.of(
                 new Attachment("f.pdf", "application/pdf", new byte[]{1}));
         final Instant now = Instant.now();
         final InboundMessage msg = new InboundMessage(
-                "email-inbound", "sender@example.com", "inbox@example.com",
-                "body", atts, now, Map.of("k", "v"));
+                "email-inbound", "email", "sender@example.com", "inbox@example.com",
+                "body", atts, now, Map.of("k", "v"), "tenant-1");
 
         assertThat(msg.connectorId()).isEqualTo("email-inbound");
+        assertThat(msg.connectorType()).isEqualTo("email");
         assertThat(msg.externalSenderId()).isEqualTo("sender@example.com");
         assertThat(msg.externalChannelRef()).isEqualTo("inbox@example.com");
         assertThat(msg.content()).isEqualTo("body");
         assertThat(msg.attachments()).hasSize(1);
         assertThat(msg.receivedAt()).isEqualTo(now);
         assertThat(msg.metadata()).containsEntry("k", "v");
+        assertThat(msg.tenancyId()).isEqualTo("tenant-1");
     }
 
     @Test
-    void sixArgConvenienceConstructor_attachmentsEmpty() {
+    void nullTenancyId_isAllowed() {
         final InboundMessage msg = new InboundMessage(
-                "slack-inbound", "U123", "C456", "hello", Instant.now(), Map.of());
-        assertThat(msg.attachments()).isEmpty();
+                "slack-inbound", "slack", "U123", "C456",
+                "hello", List.of(), Instant.now(), Map.of(), null);
+        assertThat(msg.tenancyId()).isNull();
     }
 
     @Test
-    void fiveArgConvenienceConstructor_attachmentsEmptyMetadataEmpty() {
-        final InboundMessage msg = new InboundMessage(
-                "slack-inbound", "U123", "C456", "hello", Instant.now());
-        assertThat(msg.attachments()).isEmpty();
-        assertThat(msg.metadata()).isEmpty();
+    void nullConnectorType_throwsNPE() {
+        assertThatNullPointerException().isThrownBy(() ->
+                new InboundMessage("slack-inbound", null, "U123", "C456",
+                        "hello", List.of(), Instant.now(), Map.of(), null))
+                .withMessageContaining("connectorType");
     }
 
     @Test
-    void attachments_defensivelyCopied_mutableListCannotAffectRecord() {
+    void attachments_defensivelyCopied() {
         final List<Attachment> mutable = new ArrayList<>();
         mutable.add(new Attachment("f.pdf", "application/pdf", new byte[]{1}));
         final InboundMessage msg = new InboundMessage(
-                "email-inbound", "s", "c", "body", mutable, Instant.now(), Map.of());
+                "email-inbound", "email", "s", "c",
+                "body", mutable, Instant.now(), Map.of(), null);
 
-        mutable.clear(); // mutate after construction
-        assertThat(msg.attachments()).hasSize(1); // record unaffected
+        mutable.clear();
+        assertThat(msg.attachments()).hasSize(1);
     }
 }

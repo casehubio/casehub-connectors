@@ -1,6 +1,7 @@
 package io.casehub.connectors.email.inbound;
 
 import java.util.List;
+import java.util.Optional;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -38,11 +39,15 @@ public class DefaultEmailInboundAccountProvider implements EmailInboundAccountPr
     @ConfigProperty(name = "casehub.connectors.email-inbound.reconnect-delay-seconds", defaultValue = "60")
     int reconnectDelaySeconds;
 
+    @ConfigProperty(name = "casehub.connectors.email-inbound.tenancy-id")
+    Optional<String> tenancyId;
+
     DefaultEmailInboundAccountProvider() {}
 
     DefaultEmailInboundAccountProvider(final String host, final int port, final boolean tls,
                                        final String username, final String password,
-                                       final String folder, final int reconnectDelaySeconds) {
+                                       final String folder, final int reconnectDelaySeconds,
+                                       final String tenancyId) {
         this.host = host;
         this.port = port;
         this.tls = tls;
@@ -50,6 +55,7 @@ public class DefaultEmailInboundAccountProvider implements EmailInboundAccountPr
         this.password = password;
         this.folder = folder;
         this.reconnectDelaySeconds = reconnectDelaySeconds;
+        this.tenancyId = Optional.ofNullable(tenancyId);
     }
 
     @Override
@@ -59,6 +65,7 @@ public class DefaultEmailInboundAccountProvider implements EmailInboundAccountPr
         }
         return List.of(new EmailInboundAccount(
                 EmailInboundConnector.ID, host, port, tls, username, password,
-                folder, reconnectDelaySeconds));
+                folder, reconnectDelaySeconds,
+                tenancyId.filter(s -> !s.isBlank()).orElse(null)));
     }
 }

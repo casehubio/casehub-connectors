@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -14,6 +15,8 @@ import jakarta.json.JsonObject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.casehub.connectors.HttpMethod;
+import io.casehub.connectors.InboundConnectorIds;
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.WebhookInboundConnector;
 import io.casehub.connectors.WebhookRequest;
@@ -40,8 +43,6 @@ import io.casehub.connectors.WebhookResult;
 @ApplicationScoped
 public class TeamsInboundConnector extends WebhookInboundConnector {
 
-    static final String ID = "teams-inbound";
-
     private static final Logger LOG = Logger.getLogger(TeamsInboundConnector.class.getName());
 
     @ConfigProperty(name = "casehub.connectors.teams-inbound.shared-secret",
@@ -50,7 +51,7 @@ public class TeamsInboundConnector extends WebhookInboundConnector {
 
     @Override
     public String id() {
-        return ID;
+        return InboundConnectorIds.TEAMS_INBOUND;
     }
 
     @Override
@@ -77,7 +78,7 @@ public class TeamsInboundConnector extends WebhookInboundConnector {
             return new WebhookResult.Unauthorized();
         }
 
-        return parseMessage(request.body());
+        return parseMessage(request.body(), request.tenancyId());
     }
 
     private boolean verifySignature(final String body, final String authHeader) {
@@ -97,7 +98,7 @@ public class TeamsInboundConnector extends WebhookInboundConnector {
         }
     }
 
-    private WebhookResult parseMessage(final String body) {
+    private WebhookResult parseMessage(final String body, final String tenancyId) {
         try {
             final JsonObject json = Json.createReader(new StringReader(body)).readObject();
             final String text = json.getString("text", "");
@@ -105,7 +106,8 @@ public class TeamsInboundConnector extends WebhookInboundConnector {
             final String senderId = (from != null) ? from.getString("id", "unknown") : "unknown";
             final String channelId = json.getString("channelId", "unknown");
             return new WebhookResult.Delivered(
-                    List.of(new InboundMessage(ID, senderId, channelId, text, Instant.now())));
+                    List.of(new InboundMessage(InboundConnectorIds.TEAMS_INBOUND, InboundConnectorTypes.TEAMS,
+                            senderId, channelId, text, List.of(), Instant.now(), Map.of(), tenancyId)));
         } catch (final Exception e) {
             LOG.warning("teams-inbound: failed to parse event body: " + e.getMessage());
             return new WebhookResult.Ignored();

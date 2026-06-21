@@ -8,6 +8,9 @@ package io.casehub.connectors.email.inbound;
  *
  * <p>{@code reconnectDelaySeconds} caps the exponential backoff applied between
  * connection attempts when the IMAP IDLE connection drops.
+ *
+ * <p>{@code tenancyId} identifies the tenant this account belongs to; null in
+ * single-tenant deployments.
  */
 public record EmailInboundAccount(
         String id,
@@ -17,5 +20,6 @@ public record EmailInboundAccount(
         String username,
         String password,
         String folder,
-        int reconnectDelaySeconds) {
+        int reconnectDelaySeconds,
+        String tenancyId) {
 }

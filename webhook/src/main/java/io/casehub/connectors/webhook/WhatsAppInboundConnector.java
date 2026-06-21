@@ -17,6 +17,7 @@ import jakarta.json.JsonString;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.casehub.connectors.HttpMethod;
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.WebhookInboundConnector;
 import io.casehub.connectors.WebhookRequest;
@@ -82,7 +83,7 @@ public class WhatsAppInboundConnector extends WebhookInboundConnector {
             return new WebhookResult.Unauthorized();
         }
 
-        final List<InboundMessage> messages = parseMessages(request.body());
+        final List<InboundMessage> messages = parseMessages(request.body(), request.tenancyId());
         return messages.isEmpty()
                 ? new WebhookResult.Ignored()
                 : new WebhookResult.Delivered(messages);
@@ -116,7 +117,7 @@ public class WhatsAppInboundConnector extends WebhookInboundConnector {
         return SigHelper.constantTimeEquals(expected, sigHeader.getBytes(StandardCharsets.UTF_8));
     }
 
-    private List<InboundMessage> parseMessages(final String body) {
+    private List<InboundMessage> parseMessages(final String body, final String tenancyId) {
         final List<InboundMessage> messages = new ArrayList<>();
         try {
             final JsonObject root = Json.createReader(new StringReader(body)).readObject();
@@ -129,7 +130,7 @@ public class WhatsAppInboundConnector extends WebhookInboundConnector {
                 for (final var change : changes) {
                     final JsonObject value = ((JsonObject) change).getJsonObject("value");
                     if (value == null) continue;
-                    extractMessages(value, messages);
+                    extractMessages(value, messages, tenancyId);
                 }
             }
         } catch (final Exception e) {
@@ -138,7 +139,8 @@ public class WhatsAppInboundConnector extends WebhookInboundConnector {
         return messages;
     }
 
-    private void extractMessages(final JsonObject value, final List<InboundMessage> out) {
+    private void extractMessages(final JsonObject value, final List<InboundMessage> out,
+                                     final String tenancyId) {
         final JsonArray msgs = value.getJsonArray("messages");
         if (msgs == null) return;
         final JsonObject metadata = value.getJsonObject("metadata");
@@ -153,7 +155,8 @@ public class WhatsAppInboundConnector extends WebhookInboundConnector {
             final String msgId = msg.getString("id", null);
             final Map<String, String> meta = msgId != null
                     ? Map.of("message-id", msgId) : Map.of();
-            out.add(new InboundMessage(ID, from, phoneNumberId, content, Instant.now(), meta));
+            out.add(new InboundMessage(ID, InboundConnectorTypes.WHATSAPP,
+                    from, phoneNumberId, content, List.of(), Instant.now(), meta, tenancyId));
         }
     }
 

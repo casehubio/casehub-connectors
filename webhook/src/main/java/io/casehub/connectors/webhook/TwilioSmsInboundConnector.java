@@ -15,6 +15,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import io.casehub.connectors.HttpMethod;
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.WebhookInboundConnector;
 import io.casehub.connectors.WebhookRequest;
@@ -93,7 +94,8 @@ public class TwilioSmsInboundConnector extends WebhookInboundConnector {
         final Map<String, String> meta = messageSid != null
                 ? Map.of("message-sid", messageSid) : Map.of();
         return new WebhookResult.Delivered(
-                List.of(new InboundMessage(ID, from, to, body, Instant.now(), meta)));
+                List.of(new InboundMessage(ID, InboundConnectorTypes.SMS,
+                        from, to, body, List.of(), Instant.now(), meta, request.tenancyId())));
     }
 
     private boolean verifySignature(final String url, final Map<String, String> params,

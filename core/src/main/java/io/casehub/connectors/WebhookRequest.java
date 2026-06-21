@@ -33,4 +33,9 @@ public record WebhookRequest(
         final List<String> values = headers.get(name);
         return (values == null || values.isEmpty()) ? null : values.get(0);
     }
+
+    /** Returns the tenancy ID from the {@code x-tenancy-id} header, or null. */
+    public String tenancyId() {
+        return header("x-tenancy-id");
+    }
 }

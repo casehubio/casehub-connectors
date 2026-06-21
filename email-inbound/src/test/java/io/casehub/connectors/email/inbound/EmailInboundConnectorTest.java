@@ -61,7 +61,7 @@ class EmailInboundConnectorTest {
     private EmailInboundAccount testAccount() {
         return new EmailInboundAccount(
                 "email-inbound", "localhost", GREEN_MAIL.getImap().getPort(),
-                false, "inbox@example.com", "password", "INBOX", 60);
+                false, "inbox@example.com", "password", "INBOX", 60, null);
     }
 
     /** Waits up to 5s for the IDLE loop or processUnseen to deliver a message. */
@@ -247,7 +247,7 @@ class EmailInboundConnectorTest {
         final LinkedBlockingQueue<InboundMessage> q = new LinkedBlockingQueue<>();
         final EmailInboundConnector bad = new EmailInboundConnector(() -> List.of(
                 new EmailInboundAccount("bad", "localhost", 19999, false,
-                        "u", "p", "INBOX", 1)));
+                        "u", "p", "INBOX", 1, null)));
         bad.start(q::add);
         assertThat(q.poll(500, TimeUnit.MILLISECONDS)).isNull();
         bad.stop();

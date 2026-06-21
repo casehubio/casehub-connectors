@@ -44,7 +44,8 @@ class InboundConnectorServiceTest {
     }
 
     private static InboundMessage sampleMessage(final String connectorId) {
-        return new InboundMessage(connectorId, "sender-1", "channel-1", "hello", Instant.now());
+        return new InboundMessage(connectorId, "slack", "sender-1", "channel-1",
+                "hello", List.of(), Instant.now(), Map.of(), null);
     }
 
     // ── Registry construction ───────────────────────────────────────────────
