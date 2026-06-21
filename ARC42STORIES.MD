@@ -140,6 +140,7 @@ C4Context
 | L3 — IMAP Inbound | `EmailInboundConnector`, `EmailInboundAccountProvider`, `Attachment`, IMAP IDLE, exponential backoff |
 | L4 — MCP Surface | `McpContentSanitizer`, 5 outbound MCP tools, `ConnectorMeshBridge` bridge call |
 | L5 — Slack Bot | `SlackBotClient`, `ConnectorDiscovery`, `SlackBotDiscovery`, `SlackBotMcpTool`, `ChannelDiscoveryMcpTool`, cursor pagination |
+| L6 — CloudEvents Adapter | `ConnectorCloudEventAdapter`, `InboundConnectorTypes` — optional submodule; observes `InboundMessage`, fires `CloudEvent` |
 
 ### Chapter Sequencing Rationale
 
@@ -162,8 +163,9 @@ C4Context
 | `email-inbound` | `casehub-connectors-email-inbound` | `core`, `angus-mail` |
 | `slack-bot` | `casehub-connectors-slack-bot` | `core` |
 | `mcp` | `casehub-connectors-mcp` | `core`, `email`, `slack-bot`, `quarkus-mcp-server-core` |
+| `cloud-events` | `casehub-connectors-cloud-events` | `core`, `casehub-platform-api` |
 
-`email` and `email-inbound` are separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) share no infrastructure. `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments. `mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM.
+`email` and `email-inbound` are separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) share no infrastructure. `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments. `mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM. `cloud-events` is separate because `core` carries zero external deps; adding `casehub-platform-api` (which carries `cloudevents-core`) would break that invariant.
 
 ```mermaid
 C4Container
@@ -265,6 +267,7 @@ This is a Java library — no standalone deployment. Consuming applications add 
 | `email-inbound` | Inbound IMAP email |
 | `slack-bot` | Slack bot messaging + channel discovery |
 | `mcp` | MCP tool surface for LLM agents |
+| `cloud-events` | CloudEvent adapter — bridges `InboundMessage` to `Event<CloudEvent>.fireAsync()` for casehub-ras |
 
 Consuming app adds `quarkus-mcp-server-http` (not in this library) for MCP transport.
 
@@ -926,7 +929,9 @@ Full decision records with alternatives considered: `docs/adr/`
 | `ConnectorMessage` | Outbound data record: destination, title, body, attributes. Attributes carry connector-specific extras (e.g. `templateName` for WhatsApp). |
 | `InboundConnector` | SPI for pull-based inbound transports. `start(InboundMessageSink)` begins polling; `stop()` shuts it down. Implemented by `EmailInboundConnector`. |
 | `WebhookInboundConnector` | Base type for passive inbound transports. `handle(WebhookRequest) → WebhookResult`. No lifecycle — lives as long as `WebhookRouter`. |
-| `InboundMessage` | Inbound data record: connectorId, externalSenderId, externalChannelRef, content, attachments, receivedAt, metadata. |
+| `InboundMessage` | Inbound data record: connectorId, connectorType (non-null semantic label), externalSenderId, externalChannelRef, content, attachments, receivedAt, metadata, tenancyId (nullable). `connectorType` drives CloudEvent `type` field; `tenancyId` drives CloudEvent `tenancyid` extension. |
+| `InboundConnectorTypes` | Semantic transport category constants — `SLACK`, `EMAIL`, `SMS`, `WHATSAPP`, `TEAMS`. Parallel to `InboundConnectorIds` but provider-agnostic (e.g. `SMS` not `twilio-sms`). |
+| `ConnectorCloudEventAdapter` | CDI adapter in `cloud-events` module: observes `@ObservesAsync InboundMessage`, fires `Event<CloudEvent>.fireAsync()`. Follows canonical CloudEvent adapter pattern (GE-20260621-629712). |
 | `WebhookResult` | Sealed type: `Delivered`, `Challenged`, `Ignored`, `Unauthorized`. Returned by `handle()`; exhaustive switch in `WebhookRouter`. |
 | `ConnectorMeshBridge` | SPI called by MCP tools after successful delivery. Enables Qhorus to log agent-initiated sends. `NoOpConnectorMeshBridge @DefaultBean @Unremovable` ships with `core`. |
 | `ConnectorDiscovery` | SPI for runtime-discoverable delivery targets. `discover()` returns `List<DiscoveredTarget>`. Implemented by `SlackBotDiscovery`. |
