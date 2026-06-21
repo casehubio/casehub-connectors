@@ -7,8 +7,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 /**
  * Default no-op {@link ConnectorMeshBridge}. Active when no other implementation is on
  * the classpath. Displaced automatically by any {@code @ApplicationScoped} (non-{@code
- * @DefaultBean}) implementation — specifically {@code qhorus/connector-backend} once
- * casehubio/qhorus#249 lands.
+ * @DefaultBean}) implementation — specifically {@code qhorus/connector-backend}
+ * (casehubio/qhorus#249).
  *
  * <p>{@code @Unremovable}: ARC sees no injection point within {@code core} itself;
  * the injection point lives in the {@code mcp} module. Without this annotation, ARC

@@ -6,14 +6,14 @@ package io.casehub.connectors;
  *
  * <p>The default implementation ({@link NoOpConnectorMeshBridge}) does nothing.
  * When {@code qhorus/connector-backend} is on the classpath, its implementation
- * activates by classpath presence and posts an {@code EVENT} to the active Qhorus
- * observe channel for the current case session (casehubio/qhorus#249).
+ * activates by classpath presence and posts a {@code STATUS} message to the channel
+ * configured via {@code casehub.qhorus.connector-backend.delivery-channel}.
+ * If no channel is configured, the implementation is a no-op (casehubio/qhorus#249).
  *
  * <h2>Contract for implementations</h2>
  * <ul>
  * <li>Must return quickly — no blocking network I/O on the calling thread.</li>
- * <li>Must tolerate absent case context without throwing — silently no-op when
- *     no active case session is resolvable.</li>
+ * <li>Must tolerate missing or misconfigured delivery channel without throwing.</li>
  * <li>Must never throw — exceptions propagate to the MCP tool caller.</li>
  * </ul>
  */
