@@ -1,4 +1,4 @@
-package io.casehub.connectors.cloudevents;
+package io.casehub.connectors;
 
 import java.net.URI;
 import java.time.ZoneOffset;
@@ -14,20 +14,20 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.casehub.connectors.InboundMessage;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 
 @ApplicationScoped
-public class ConnectorCloudEventAdapter {
+public class ConnectorsCloudEventAdapter {
 
-    private static final Logger LOG = Logger.getLogger(ConnectorCloudEventAdapter.class);
+    private static final Logger LOG = Logger.getLogger(ConnectorsCloudEventAdapter.class);
+    private static final String TYPE_PREFIX = "io.casehub.connectors.inbound.";
 
     private final Event<CloudEvent> cloudEventBus;
     private final ObjectMapper objectMapper;
 
     @Inject
-    public ConnectorCloudEventAdapter(Event<CloudEvent> cloudEventBus, ObjectMapper objectMapper) {
+    public ConnectorsCloudEventAdapter(Event<CloudEvent> cloudEventBus, ObjectMapper objectMapper) {
         this.cloudEventBus = cloudEventBus;
         this.objectMapper = objectMapper;
     }
@@ -44,12 +44,11 @@ public class ConnectorCloudEventAdapter {
 
         CloudEventBuilder builder = CloudEventBuilder.v1()
                 .withId(UUID.randomUUID().toString())
-                .withType("io.casehub.connectors.inbound." + message.connectorType())
+                .withType(TYPE_PREFIX + message.connectorType())
                 .withSource(URI.create("/casehub-connectors/" + message.connectorId()))
                 .withSubject("channel/" + message.externalChannelRef())
                 .withTime(message.receivedAt().atOffset(ZoneOffset.UTC))
-                .withDataContentType("application/json")
-                .withData(data);
+                .withData("application/json", data);
 
         if (message.tenancyId() != null) {
             builder = builder.withExtension("tenancyid", message.tenancyId());

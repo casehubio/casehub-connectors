@@ -5,7 +5,7 @@
 **Profile ref:** `../parent/docs/arc42stories-casehub-profile.md` · fallback: `https://raw.githubusercontent.com/casehubio/parent/main/docs/arc42stories-casehub-profile.md`
 **Build position:** Foundation — no casehubio dependencies
 **Consumed by:** casehub-qhorus, casehub-devtown, casehub-aml, casehub-clinical, and any harness deploying the MCP surface
-**Depends on:** Quarkus BOM + JDK only (core module: JDK only)
+**Depends on:** Quarkus BOM + external standards (core: CDI, cloudevents-core, quarkus-jackson; zero casehubio deps)
 **Prefix:** CN
 
 ---
@@ -31,7 +31,7 @@ Platform library: outbound and inbound message delivery for the casehubio platfo
 
 | Goal | Mechanism |
 |---|---|
-| Zero-dep core | `java.net.http.HttpClient` only; no framework dep in `core` or `slack-bot` |
+| Lightweight foundation | CDI + external standards only (CloudEvents SDK, Jackson); no casehubio dependencies in `core` or `slack-bot` |
 | Self-contained connectors | Each connector implements against its own REST API; full delivery path in one class |
 | Fail-soft | Connectors log and return on failure — no unchecked exceptions propagate to caller |
 | Fail-soft MCP tools | Tools catch all exceptions; return `"Failed: <message>"` — stack traces never reach LLM |
@@ -56,7 +56,7 @@ Platform library: outbound and inbound message delivery for the casehubio platfo
 | Constraint | Source |
 |---|---|
 | Java 21, Quarkus 3.32.2 | Platform standard — all casehubio repos aligned |
-| `core` and `slack-bot` modules: zero non-JDK runtime dependencies | Design principle — library embeds without pulling a framework |
+| `core` and `slack-bot` modules: no casehubio runtime dependencies; external libraries only (Quarkus CDI, CloudEvents SDK, Jackson) | Design principle — foundation tier embeds without coupling to platform |
 | No business logic, routing, or orchestration | Library boundary rule — callers own those concerns |
 | CDI-native | Platform convention — no registry, factory, or custom wiring |
 | All modules published to GitHub Packages as `0.2-SNAPSHOT` | Platform publishing convention |
@@ -140,7 +140,7 @@ C4Context
 | L3 — IMAP Inbound | `EmailInboundConnector`, `EmailInboundAccountProvider`, `Attachment`, IMAP IDLE, exponential backoff |
 | L4 — MCP Surface | `McpContentSanitizer`, 5 outbound MCP tools, `ConnectorMeshBridge` bridge call |
 | L5 — Slack Bot | `SlackBotClient`, `ConnectorDiscovery`, `SlackBotDiscovery`, `SlackBotMcpTool`, `ChannelDiscoveryMcpTool`, cursor pagination |
-| L6 — CloudEvents Adapter | `ConnectorCloudEventAdapter`, `InboundConnectorTypes` — optional submodule; observes `InboundMessage`, fires `CloudEvent` |
+| L6 — CloudEvents Adapter | `ConnectorsCloudEventAdapter`, `InboundConnectorTypes` — in core; observes `InboundMessage`, fires `CloudEvent` |
 
 ### Chapter Sequencing Rationale
 
@@ -157,15 +157,14 @@ C4Context
 
 | Module | Artifact | Depends on |
 |---|---|---|
-| `core` | `casehub-connectors-core` | JDK only |
+| `core` | `casehub-connectors-core` | CDI, `cloudevents-core`, `quarkus-jackson` |
 | `webhook` | `casehub-connectors-webhook` | `core`, `quarkus-rest` |
 | `email` | `casehub-connectors-email` | `core`, `quarkus-mailer` |
 | `email-inbound` | `casehub-connectors-email-inbound` | `core`, `angus-mail` |
 | `slack-bot` | `casehub-connectors-slack-bot` | `core` |
 | `mcp` | `casehub-connectors-mcp` | `core`, `email`, `slack-bot`, `quarkus-mcp-server-core` |
-| `cloud-events` | `casehub-connectors-cloud-events` | `core`, `casehub-platform-api` |
 
-`email` and `email-inbound` are separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) share no infrastructure. `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments. `mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM. `cloud-events` is separate because `core` carries zero external deps; adding `casehub-platform-api` (which carries `cloudevents-core`) would break that invariant.
+`email` and `email-inbound` are separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) share no infrastructure. `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments. `mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM.
 
 ```mermaid
 C4Container
@@ -267,7 +266,6 @@ This is a Java library — no standalone deployment. Consuming applications add 
 | `email-inbound` | Inbound IMAP email |
 | `slack-bot` | Slack bot messaging + channel discovery |
 | `mcp` | MCP tool surface for LLM agents |
-| `cloud-events` | CloudEvent adapter — bridges `InboundMessage` to `Event<CloudEvent>.fireAsync()` for casehub-ras |
 
 Consuming app adds `quarkus-mcp-server-http` (not in this library) for MCP transport.
 
@@ -931,7 +929,7 @@ Full decision records with alternatives considered: `docs/adr/`
 | `WebhookInboundConnector` | Base type for passive inbound transports. `handle(WebhookRequest) → WebhookResult`. No lifecycle — lives as long as `WebhookRouter`. |
 | `InboundMessage` | Inbound data record: connectorId, connectorType (non-null semantic label), externalSenderId, externalChannelRef, content, attachments, receivedAt, metadata, tenancyId (nullable). `connectorType` drives CloudEvent `type` field; `tenancyId` drives CloudEvent `tenancyid` extension. |
 | `InboundConnectorTypes` | Semantic transport category constants — `SLACK`, `EMAIL`, `SMS`, `WHATSAPP`, `TEAMS`. Parallel to `InboundConnectorIds` but provider-agnostic (e.g. `SMS` not `twilio-sms`). |
-| `ConnectorCloudEventAdapter` | CDI adapter in `cloud-events` module: observes `@ObservesAsync InboundMessage`, fires `Event<CloudEvent>.fireAsync()`. Follows canonical CloudEvent adapter pattern (GE-20260621-629712). |
+| `ConnectorsCloudEventAdapter` | CDI adapter in `core`: observes `@ObservesAsync InboundMessage`, fires `Event<CloudEvent>.fireAsync()`. Follows canonical CloudEvent adapter pattern (GE-20260621-629712). |
 | `WebhookResult` | Sealed type: `Delivered`, `Challenged`, `Ignored`, `Unauthorized`. Returned by `handle()`; exhaustive switch in `WebhookRouter`. |
 | `ConnectorMeshBridge` | SPI called by MCP tools after successful delivery. Enables Qhorus to log agent-initiated sends. `NoOpConnectorMeshBridge @DefaultBean @Unremovable` ships with `core`. |
 | `ConnectorDiscovery` | SPI for runtime-discoverable delivery targets. `discover()` returns `List<DiscoveredTarget>`. Implemented by `SlackBotDiscovery`. |

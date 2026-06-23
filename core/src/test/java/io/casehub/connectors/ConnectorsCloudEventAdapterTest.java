@@ -1,4 +1,4 @@
-package io.casehub.connectors.cloudevents;
+package io.casehub.connectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,15 +15,12 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import io.casehub.connectors.InboundConnectorIds;
-import io.casehub.connectors.InboundConnectorTypes;
-import io.casehub.connectors.InboundMessage;
 import io.cloudevents.CloudEvent;
 
-class ConnectorCloudEventAdapterTest {
+class ConnectorsCloudEventAdapterTest {
 
     private final List<CloudEvent> fired = new ArrayList<>();
-    private ConnectorCloudEventAdapter adapter;
+    private ConnectorsCloudEventAdapter adapter;
 
     @BeforeEach
     void setUp() {
@@ -46,7 +43,7 @@ class ConnectorCloudEventAdapterTest {
         };
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
-        adapter = new ConnectorCloudEventAdapter(mockEvent, mapper);
+        adapter = new ConnectorsCloudEventAdapter(mockEvent, mapper);
     }
 
     @Test
