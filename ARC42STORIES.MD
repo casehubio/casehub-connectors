@@ -889,6 +889,9 @@ All layer-specific decisions are recorded inline in §9.4. Cross-cutting decisio
 | ADR-0001 | Separate types for pull-based and webhook-based inbound connectors | `InboundConnector` (pull lifecycle) and `WebhookInboundConnector` (passive) — type encodes lifecycle semantics |
 | ADR-0002 | IMAP IDLE only — no polling fallback | Single code path; SEVERE log on non-IDLE server; no silent degradation |
 | ADR-0003 | `ConnectorMeshBridge` SPI in `core`, not `mcp` | `qhorus/connector-backend` depends on `core` already; zero new cross-repo dependency required |
+| — | `slack-bot` as separate submodule, not in `core` | Follows `email-inbound` precedent — purpose-specific modules activate by classpath presence; keeps `core` classpath clean |
+| — | Shared `HttpHelper.CLIENT` for bot HTTP calls | Single connection pool and timeout config across all connector types; avoids duplicate singleton |
+| — | Jakarta JSON builder for bot payload construction | `Json.createObjectBuilder()` over manual string building — consistent with rest of codebase, safe under charset edge cases |
 
 Full decision records with alternatives considered: `docs/adr/`
 
