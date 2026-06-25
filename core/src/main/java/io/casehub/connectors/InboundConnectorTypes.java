@@ -17,6 +17,8 @@ public final class InboundConnectorTypes {
     public static final String SMS      = "sms";
     public static final String WHATSAPP = "whatsapp";
     public static final String TEAMS    = "teams";
+    public static final String DISCORD  = "discord";
+    public static final String IRC      = "irc";
 
     private InboundConnectorTypes() {}
 }
