@@ -7,8 +7,11 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="casehub-connectors-slack-bot" />
+        <module name="casehub-connectors-chat-ref" />
         <module name="casehub-connectors-email-inbound" />
+        <module name="casehub-connectors-chat-spi" />
         <module name="casehub-connectors-mcp" />
+        <module name="casehub-connectors-chat-irc" />
         <module name="casehub-connectors-email" />
         <module name="casehub-connectors-core" />
         <module name="casehub-connectors-webhook" />

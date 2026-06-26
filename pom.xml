@@ -30,6 +30,7 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
     <module>slack-bot</module>
     <module>chat-spi</module>
     <module>chat-ref</module>
+    <module>chat-irc</module>
   </modules>
 
   <properties>
