@@ -107,7 +107,7 @@ type: java
 
 ## What This Project Is
 
-Outbound and inbound message connector library for the casehubio platform. Provides a `Connector` CDI SPI (outbound) and `InboundConnector`/`WebhookInboundConnector` SPIs (inbound) with built-in implementations for Slack, Teams, Twilio SMS, WhatsApp, and email. Also provides a `ChatPlatform` SPI (`chat-spi`) for structured interaction with chat systems (channels, threads, reactions, presence, members) with graceful degradation across platforms.
+Outbound and inbound message connector library for the casehubio platform. Provides a `Connector` CDI SPI (outbound) and `InboundConnector`/`WebhookInboundConnector` SPIs (inbound) with built-in implementations for Slack, Teams, Twilio SMS, WhatsApp, and email. Also provides a `ChatPlatform` SPI (`chat-spi`) for structured interaction with chat systems (channels, threads, reactions, presence, members, channel management, member management, message history) with graceful degradation across platforms. Includes a profile-gated demo chat service (`chat-demo`, `-Pdemo`) with SQLite persistence, REST/WebSocket endpoints, and a pre-populated seed database.
 
 **This is the canonical connector infrastructure for the platform.** Any casehubio repo that needs to send outbound messages or receive inbound webhook messages must use these SPIs, not implement its own connector.
 
@@ -123,6 +123,11 @@ Do not add business logic, orchestration, or domain knowledge here. This library
 
 ```bash
 JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install
+```
+
+**With demo module:**
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install -Pdemo
 ```
 
 **Use `mvn` not `./mvnw`** — maven wrapper not configured on this machine.

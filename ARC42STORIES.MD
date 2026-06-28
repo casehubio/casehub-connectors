@@ -141,6 +141,8 @@ C4Context
 | L4 — MCP Surface | `McpContentSanitizer`, 5 outbound MCP tools, `ConnectorMeshBridge` bridge call |
 | L5 — Slack Bot | `SlackBotClient`, `ConnectorDiscovery`, `SlackBotDiscovery`, `SlackBotMcpTool`, `ChannelDiscoveryMcpTool`, cursor pagination |
 | L6 — CloudEvents Adapter | `ConnectorsCloudEventAdapter`, `InboundConnectorTypes` — in core; observes `InboundMessage`, fires `CloudEvent` |
+| L7 — Chat SPI Extensions | `ChannelManagement`, `MemberManagement`, `MessageHistory` capabilities + `Reactions.list()`, `Presence.set()` — extends composed-capabilities pattern with auto-degradation defaults |
+| L8 — Chat Demo | `chat-demo` module (profile-gated `-Pdemo`): `SqliteChatBackend`, REST endpoints mapping 1:1 to ChatPlatform capabilities, WebSocket broadcaster, seed database. Not published. |
 
 ### Chapter Sequencing Rationale
 
@@ -163,6 +165,10 @@ C4Context
 | `email-inbound` | `casehub-connectors-email-inbound` | `core`, `angus-mail` |
 | `slack-bot` | `casehub-connectors-slack-bot` | `core` |
 | `mcp` | `casehub-connectors-mcp` | `core`, `email`, `slack-bot`, `quarkus-mcp-server-core` |
+| `chat-spi` | `casehub-connectors-chat-spi` | CDI (annotation-only) |
+| `chat-ref` | `casehub-connectors-chat-ref` | `chat-spi`, `quarkus-arc` |
+| `chat-irc` | `casehub-connectors-chat-irc` | `chat-spi`, `core` |
+| `chat-demo` | `casehub-connectors-chat-demo` | `chat-spi`, `chat-ref`, `core`, `quarkus-rest-jackson`, `quarkus-websockets-next`, `sqlite-jdbc`, `HikariCP` (profile-gated `-Pdemo`) |
 
 `email` and `email-inbound` are separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) share no infrastructure. `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments. `mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM.
 
@@ -892,6 +898,9 @@ All layer-specific decisions are recorded inline in §9.4. Cross-cutting decisio
 | — | `slack-bot` as separate submodule, not in `core` | Follows `email-inbound` precedent — purpose-specific modules activate by classpath presence; keeps `core` classpath clean |
 | — | Shared `HttpHelper.CLIENT` for bot HTTP calls | Single connection pool and timeout config across all connector types; avoids duplicate singleton |
 | — | Jakarta JSON builder for bot payload construction | `Json.createObjectBuilder()` over manual string building — consistent with rest of codebase, safe under charset edge cases |
+| — | `ChatBackend` internal to `chat-ref`, not in `chat-spi` | Each ChatPlatform impl owns its storage (IrcClient for IRC, SlackBotClient for Slack, ChatBackend for ref/demo); persistence is not a platform-wide SPI |
+| — | `Channel` record gains `description` field | Topic is dynamic, description is static — Slack/Discord distinguish them; IRC passes null. Breaking change, mechanical migration. |
+| — | `Presence` no longer a functional interface | Adding `set()` breaks SAM status; intentional — degradation model requires explicit method implementations |
 
 Full decision records with alternatives considered: `docs/adr/`
 

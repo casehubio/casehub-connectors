@@ -9,6 +9,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import io.casehub.connectors.chat.degraded.ChannelFallbackThreading;
+import io.casehub.connectors.chat.degraded.EmptyMessageHistory;
+import io.casehub.connectors.chat.degraded.NoOpChannelManagement;
+import io.casehub.connectors.chat.degraded.NoOpMemberManagement;
 import io.casehub.connectors.chat.degraded.NoOpReactions;
 import io.casehub.connectors.chat.degraded.UnknownPresence;
 import io.casehub.connectors.chat.model.Channel;
@@ -17,9 +20,12 @@ import io.casehub.connectors.chat.model.ChatMessageRef;
 import io.casehub.connectors.chat.model.Member;
 import io.casehub.connectors.chat.model.MemberRef;
 import io.casehub.connectors.chat.model.SendResult;
+import io.casehub.connectors.chat.spi.ChannelManagement;
 import io.casehub.connectors.chat.spi.ChatPlatform;
 import io.casehub.connectors.chat.spi.Discovery;
+import io.casehub.connectors.chat.spi.MemberManagement;
 import io.casehub.connectors.chat.spi.Members;
+import io.casehub.connectors.chat.spi.MessageHistory;
 import io.casehub.connectors.chat.spi.Messaging;
 import io.casehub.connectors.chat.spi.Presence;
 import io.casehub.connectors.chat.spi.Reactions;
@@ -38,6 +44,9 @@ public class IrcChatPlatform implements ChatPlatform {
     private final Members members;
     private final Reactions reactions = new NoOpReactions();
     private final Presence presence = new UnknownPresence();
+    private final ChannelManagement channelManagement = new NoOpChannelManagement();
+    private final MemberManagement memberManagement = new NoOpMemberManagement();
+    private final MessageHistory messageHistory = new EmptyMessageHistory();
 
     @Inject
     public IrcChatPlatform(final IrcClient client) {
@@ -56,6 +65,7 @@ public class IrcChatPlatform implements ChatPlatform {
                         new ChatChannelRef(ci.name()),
                         ci.name(),
                         ci.topic(),
+                        null,
                         false))
                 .toList();
         this.members = channel -> client.names(channel.id()).stream()
@@ -70,6 +80,9 @@ public class IrcChatPlatform implements ChatPlatform {
     @Override public Reactions reactions() { return reactions; }
     @Override public Presence presence() { return presence; }
     @Override public Members members() { return members; }
+    @Override public ChannelManagement channelManagement() { return channelManagement; }
+    @Override public MemberManagement memberManagement() { return memberManagement; }
+    @Override public MessageHistory messageHistory() { return messageHistory; }
 
     @Override
     public boolean supports(final Class<?> capability) {

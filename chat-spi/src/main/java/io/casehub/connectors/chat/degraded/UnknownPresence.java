@@ -9,4 +9,7 @@ public class UnknownPresence implements Presence {
     public PresenceStatus of(final MemberRef member) {
         return PresenceStatus.UNKNOWN;
     }
+
+    @Override
+    public void set(final MemberRef member, final PresenceStatus status) {}
 }

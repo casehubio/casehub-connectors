@@ -10,8 +10,13 @@ import org.junit.jupiter.api.Test;
 import io.casehub.connectors.chat.degraded.ChannelFallbackThreading;
 import io.casehub.connectors.chat.degraded.EmptyDiscovery;
 import io.casehub.connectors.chat.degraded.EmptyMembers;
+import io.casehub.connectors.chat.degraded.EmptyMessageHistory;
+import io.casehub.connectors.chat.degraded.NoOpChannelManagement;
+import io.casehub.connectors.chat.degraded.NoOpMemberManagement;
 import io.casehub.connectors.chat.degraded.NoOpReactions;
 import io.casehub.connectors.chat.degraded.UnknownPresence;
+import io.casehub.connectors.chat.model.MemberRef;
+import io.casehub.connectors.chat.model.PresenceStatus;
 import io.casehub.connectors.chat.model.ChatChannelRef;
 import io.casehub.connectors.chat.model.ChatContent;
 import io.casehub.connectors.chat.model.ChatMessageRef;
@@ -42,6 +47,9 @@ class ChatPlatformBuilderTest {
         assertThat(platform.reactions()).isInstanceOf(NoOpReactions.class);
         assertThat(platform.presence()).isInstanceOf(UnknownPresence.class);
         assertThat(platform.members()).isInstanceOf(EmptyMembers.class);
+        assertThat(platform.channelManagement()).isInstanceOf(NoOpChannelManagement.class);
+        assertThat(platform.memberManagement()).isInstanceOf(NoOpMemberManagement.class);
+        assertThat(platform.messageHistory()).isInstanceOf(EmptyMessageHistory.class);
     }
 
     @Test
@@ -56,6 +64,9 @@ class ChatPlatformBuilderTest {
         assertThat(platform.supports(Reactions.class)).isFalse();
         assertThat(platform.supports(Presence.class)).isFalse();
         assertThat(platform.supports(Members.class)).isFalse();
+        assertThat(platform.supports(ChannelManagement.class)).isFalse();
+        assertThat(platform.supports(MemberManagement.class)).isFalse();
+        assertThat(platform.supports(MessageHistory.class)).isFalse();
     }
 
     @Test
@@ -68,7 +79,10 @@ class ChatPlatformBuilderTest {
                 .threading(threading)
                 .discovery(java.util.List::of)
                 .reactions(new NoOpReactions())
-                .presence(m -> io.casehub.connectors.chat.model.PresenceStatus.ONLINE)
+                .presence(new Presence() {
+                    @Override public PresenceStatus of(final MemberRef member) { return PresenceStatus.ONLINE; }
+                    @Override public void set(final MemberRef member, final PresenceStatus status) {}
+                })
                 .members(ch -> java.util.List.of())
                 .build();
 
@@ -78,6 +92,9 @@ class ChatPlatformBuilderTest {
         assertThat(platform.supports(Reactions.class)).isTrue();
         assertThat(platform.supports(Presence.class)).isTrue();
         assertThat(platform.supports(Members.class)).isTrue();
+        assertThat(platform.supports(ChannelManagement.class)).isFalse();
+        assertThat(platform.supports(MemberManagement.class)).isFalse();
+        assertThat(platform.supports(MessageHistory.class)).isFalse();
     }
 
     @Test

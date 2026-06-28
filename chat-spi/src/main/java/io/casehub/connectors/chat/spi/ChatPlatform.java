@@ -7,6 +7,9 @@ import java.util.Set;
 import io.casehub.connectors.chat.degraded.ChannelFallbackThreading;
 import io.casehub.connectors.chat.degraded.EmptyDiscovery;
 import io.casehub.connectors.chat.degraded.EmptyMembers;
+import io.casehub.connectors.chat.degraded.EmptyMessageHistory;
+import io.casehub.connectors.chat.degraded.NoOpChannelManagement;
+import io.casehub.connectors.chat.degraded.NoOpMemberManagement;
 import io.casehub.connectors.chat.degraded.NoOpReactions;
 import io.casehub.connectors.chat.degraded.UnknownPresence;
 
@@ -89,6 +92,27 @@ public interface ChatPlatform {
     Members members();
 
     /**
+     * Returns the channel management capability for creating and finding channels.
+     *
+     * @return the channel management implementation; never null (may be degraded)
+     */
+    ChannelManagement channelManagement();
+
+    /**
+     * Returns the member management capability for adding/removing channel members.
+     *
+     * @return the member management implementation; never null (may be degraded)
+     */
+    MemberManagement memberManagement();
+
+    /**
+     * Returns the message history capability for querying past messages.
+     *
+     * @return the message history implementation; never null (may be degraded)
+     */
+    MessageHistory messageHistory();
+
+    /**
      * Returns {@code true} if this platform natively supports the given capability.
      * Returns {@code false} if the capability is degraded or emulated.
      *
@@ -109,6 +133,9 @@ public interface ChatPlatform {
         private Reactions reactions;
         private Presence presence;
         private Members members;
+        private ChannelManagement channelManagement;
+        private MemberManagement memberManagement;
+        private MessageHistory messageHistory;
         private final Set<Class<?>> nativeCapabilities = new HashSet<>();
 
         Builder(final String id) {
@@ -121,6 +148,9 @@ public interface ChatPlatform {
         public Builder reactions(final Reactions r) { this.reactions = r; nativeCapabilities.add(Reactions.class); return this; }
         public Builder presence(final Presence p) { this.presence = p; nativeCapabilities.add(Presence.class); return this; }
         public Builder members(final Members m) { this.members = m; nativeCapabilities.add(Members.class); return this; }
+        public Builder channelManagement(final ChannelManagement cm) { this.channelManagement = cm; nativeCapabilities.add(ChannelManagement.class); return this; }
+        public Builder memberManagement(final MemberManagement mm) { this.memberManagement = mm; nativeCapabilities.add(MemberManagement.class); return this; }
+        public Builder messageHistory(final MessageHistory mh) { this.messageHistory = mh; nativeCapabilities.add(MessageHistory.class); return this; }
 
         public ChatPlatform build() {
             Objects.requireNonNull(messaging, "messaging is required");
@@ -132,6 +162,9 @@ public interface ChatPlatform {
                     reactions != null ? reactions : new NoOpReactions(),
                     presence != null ? presence : new UnknownPresence(),
                     members != null ? members : new EmptyMembers(),
+                    channelManagement != null ? channelManagement : new NoOpChannelManagement(),
+                    memberManagement != null ? memberManagement : new NoOpMemberManagement(),
+                    messageHistory != null ? messageHistory : new EmptyMessageHistory(),
                     Set.copyOf(nativeCapabilities));
         }
     }

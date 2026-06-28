@@ -10,6 +10,9 @@ record DefaultChatPlatform(
         Reactions reactions,
         Presence presence,
         Members members,
+        ChannelManagement channelManagement,
+        MemberManagement memberManagement,
+        MessageHistory messageHistory,
         Set<Class<?>> nativeCapabilities) implements ChatPlatform {
 
     @Override
