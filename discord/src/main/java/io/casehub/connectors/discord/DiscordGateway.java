@@ -1,9 +1,7 @@
 package io.casehub.connectors.discord;
 
 import java.net.URI;
-import java.net.http.WebSocket;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -12,7 +10,11 @@ import java.util.logging.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.casehub.connectors.http.HttpHelper;
+import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpClientOptions;
+import io.vertx.core.http.WebSocket;
+import io.vertx.core.http.WebSocketConnectOptions;
 
 /**
  * Discord Gateway v10 WebSocket client.
@@ -24,8 +26,8 @@ import io.casehub.connectors.http.HttpHelper;
  * <p>NOT a CDI bean — instantiated by {@code DiscordInboundConnector} which
  * controls its lifecycle. The connection lifecycle is explicit, not container-managed.
  *
- * <p>Uses {@link HttpHelper#CLIENT} for WebSocket connections per the
- * shared-http-client protocol.
+ * <p>Uses Vert.x WebSocket client for Gateway connections (RFC 6455 compliant).
+ * REST calls still use {@link io.casehub.connectors.http.HttpHelper#CLIENT}.
  */
 public class DiscordGateway {
 
@@ -54,8 +56,12 @@ public class DiscordGateway {
     private volatile boolean stopping;
 
     // Signalled when the current connection should close — either by the server
-    // (onClose/onError) or by closeWebSocket() after ws.abort().
+    // (close/exception handler) or by closeWebSocket().
     private volatile CompletableFuture<Void> closeFuture;
+
+    // Vert.x resources — created per connect(), closed on disconnect()
+    private volatile Vertx vertx;
+    private volatile HttpClient httpClient;
 
     private String token;
     private int intents;
@@ -70,9 +76,6 @@ public class DiscordGateway {
     // Heartbeat state
     private volatile long heartbeatIntervalMs;
     private volatile boolean heartbeatAckReceived;
-
-    // Frame accumulation
-    private final StringBuilder frameBuffer = new StringBuilder();
 
     /**
      * Connects to the Discord Gateway and begins event delivery.
@@ -97,6 +100,10 @@ public class DiscordGateway {
         this.listener = listener;
         this.stopping = false;
 
+        // Create Vert.x resources for the lifetime of this connection
+        vertx = Vertx.vertx();
+        httpClient = vertx.createHttpClient(new HttpClientOptions());
+
         connectThread = Thread.ofVirtual().name("discord-gateway-connect").start(this::connectLoop);
     }
 
@@ -112,6 +119,26 @@ public class DiscordGateway {
         if (ct != null) {
             ct.interrupt();
             connectThread = null;
+        }
+
+        // Close Vert.x resources
+        HttpClient hc = httpClient;
+        if (hc != null) {
+            try {
+                hc.close().toCompletionStage().toCompletableFuture().join();
+            } catch (Exception e) {
+                // ignore
+            }
+            httpClient = null;
+        }
+        Vertx v = vertx;
+        if (v != null) {
+            try {
+                v.close().toCompletionStage().toCompletableFuture().join();
+            } catch (Exception e) {
+                // ignore
+            }
+            vertx = null;
         }
     }
 
@@ -156,7 +183,6 @@ public class DiscordGateway {
 
     private void doConnect() throws Exception {
         state = GatewayState.CONNECTING;
-        frameBuffer.setLength(0);
         heartbeatAckReceived = true;
 
         // Choose URL: resume URL if resuming, otherwise initial gateway URL
@@ -168,42 +194,36 @@ public class DiscordGateway {
 
         closeFuture = new CompletableFuture<>();
 
-        webSocket = HttpHelper.CLIENT.newWebSocketBuilder()
-                .buildAsync(URI.create(connectUrl), new WebSocket.Listener() {
+        // Parse the URL to extract host, port, ssl, path
+        URI uri = URI.create(connectUrl);
+        boolean ssl = "wss".equalsIgnoreCase(uri.getScheme());
+        String host = uri.getHost();
+        int port = uri.getPort();
+        if (port < 0) {
+            port = ssl ? 443 : 80;
+        }
+        String path = uri.getRawPath();
+        if (path == null || path.isEmpty()) {
+            path = "/";
+        }
+        String query = uri.getRawQuery();
+        if (query != null && !query.isEmpty()) {
+            path = path + "?" + query;
+        }
 
-                    @Override
-                    public void onOpen(WebSocket ws) {
-                        // Assign here — buildAsync().join() may not have returned yet
-                        // when onText fires with the HELLO frame, so the field must be
-                        // set before any message handling that calls sendText().
-                        webSocket = ws;
-                        ws.request(1);
-                    }
+        WebSocketConnectOptions opts = new WebSocketConnectOptions()
+                .setHost(host)
+                .setPort(port)
+                .setSsl(ssl)
+                .setURI(path);
 
-                    @Override
-                    public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
-                        frameBuffer.append(data);
-                        if (last) {
-                            String message = frameBuffer.toString();
-                            frameBuffer.setLength(0);
-                            handleMessage(message);
-                        }
-                        ws.request(1);
-                        return null;
-                    }
+        webSocket = httpClient.webSocket(opts)
+                .toCompletionStage().toCompletableFuture().join();
 
-                    @Override
-                    public CompletionStage<?> onClose(WebSocket ws, int statusCode, String reason) {
-                        closeFuture.complete(null);
-                        return null;
-                    }
-
-                    @Override
-                    public void onError(WebSocket ws, Throwable error) {
-                        closeFuture.completeExceptionally(error);
-                    }
-                })
-                .join();
+        WebSocket ws = webSocket;
+        ws.textMessageHandler(this::handleMessage);
+        ws.closeHandler(v -> closeFuture.complete(null));
+        ws.exceptionHandler(err -> closeFuture.completeExceptionally(err));
 
         // Block until connection closes
         try {
@@ -341,13 +361,8 @@ public class DiscordGateway {
     private void sendText(String text) {
         WebSocket ws = webSocket;
         if (ws != null) {
-            // Do NOT call .join() — this method is called from the WebSocket's
-            // onText callback thread, and blocking it would deadlock the I/O loop.
-            ws.sendText(text, true).whenComplete((webSocket1, error) -> {
-                if (error != null) {
-                    LOG.warning("discord-gateway: send failed: " + error.getMessage());
-                }
-            });
+            ws.writeTextMessage(text).onFailure(error ->
+                    LOG.warning("discord-gateway: send failed: " + error.getMessage()));
         }
     }
 
@@ -390,14 +405,12 @@ public class DiscordGateway {
         WebSocket ws = webSocket;
         if (ws != null) {
             try {
-                // Abort rather than sendClose — avoids blocking the event thread
-                // and handles cases where the connection is already broken.
-                ws.abort();
+                ws.close().onComplete(ar -> {});
             } catch (Exception e) {
                 // ignore — connection may already be closed
             }
         }
-        // Signal the connect loop to proceed — abort() does not fire onClose/onError.
+        // Signal the connect loop to proceed
         CompletableFuture<Void> cf = closeFuture;
         if (cf != null) {
             cf.complete(null);

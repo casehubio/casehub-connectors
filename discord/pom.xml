@@ -13,7 +13,7 @@
   <artifactId>casehub-connectors-discord</artifactId>
   <name>CaseHub Connectors — Discord</name>
   <description>Discord Bot API client (REST v10 + Gateway WebSocket).
-Uses java.net.http — no external SDK dependency.</description>
+Uses java.net.http for REST, Vert.x WebSocket for Gateway.</description>
 
   <dependencies>
     <dependency>
@@ -24,6 +24,10 @@ Uses java.net.http — no external SDK dependency.</description>
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-arc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-core</artifactId>
     </dependency>
 
     <!-- Testing -->

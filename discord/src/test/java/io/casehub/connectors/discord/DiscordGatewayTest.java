@@ -162,11 +162,12 @@ class DiscordGatewayTest {
         assertThat(server.awaitConnections(10, TimeUnit.SECONDS))
                 .as("Should reconnect after disconnect").isTrue();
 
-        // Wait for RESUME to be sent
-        Thread.sleep(500);
+        // Wait for RESUME to be sent (replaces fixed Thread.sleep)
+        org.awaitility.Awaitility.await()
+                .atMost(10, TimeUnit.SECONDS)
+                .until(() -> !server.getReceivedResumes().isEmpty());
 
         List<String> resumes = server.getReceivedResumes();
-        assertThat(resumes).isNotEmpty();
         assertThat(resumes.get(0)).contains("\"session_id\":\"test-session-id\"");
         assertThat(resumes.get(0)).contains("\"token\":\"" + TOKEN + "\"");
     }
@@ -191,12 +192,10 @@ class DiscordGatewayTest {
         assertThat(server.awaitConnections(10, TimeUnit.SECONDS))
                 .as("Should reconnect after INVALID_SESSION").isTrue();
 
-        // Wait for IDENTIFY to arrive
-        Thread.sleep(500);
-
-        // Should have sent a new IDENTIFY (not a RESUME)
-        assertThat(server.getReceivedIdentifies().size())
-                .isGreaterThan(identifyCountBefore);
+        // Wait for the new IDENTIFY to arrive (replaces fixed Thread.sleep)
+        org.awaitility.Awaitility.await()
+                .atMost(10, TimeUnit.SECONDS)
+                .until(() -> server.getReceivedIdentifies().size() > identifyCountBefore);
     }
 
     @Test
