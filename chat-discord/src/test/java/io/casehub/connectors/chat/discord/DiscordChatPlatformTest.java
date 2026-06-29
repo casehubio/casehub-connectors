@@ -2,12 +2,16 @@ package io.casehub.connectors.chat.discord;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,17 +19,23 @@ import org.junit.jupiter.api.Test;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 
+import io.casehub.connectors.InboundMessage;
+import io.casehub.connectors.InboundMessageSink;
 import io.casehub.connectors.chat.model.*;
 import io.casehub.connectors.chat.spi.*;
 import io.casehub.connectors.discord.DiscordClient;
 import io.casehub.connectors.discord.DiscordGatewayPresenceCache;
+import io.casehub.connectors.discord.test.EmbeddedDiscordGateway;
 
 class DiscordChatPlatformTest {
 
     private static WireMockServer wireMock;
+    private static EmbeddedDiscordGateway embeddedGateway;
     private DiscordClient client;
     private DiscordGatewayPresenceCache presenceCache;
     private DiscordChatPlatform platform;
+    private DiscordInboundConnector inboundConnector;
+    private RecordingSink recordingSink;
 
     @BeforeAll
     static void startWireMock() {
@@ -36,6 +46,17 @@ class DiscordChatPlatformTest {
     @AfterAll
     static void stopWireMock() {
         wireMock.stop();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (inboundConnector != null) {
+            inboundConnector.stop();
+        }
+        if (embeddedGateway != null) {
+            embeddedGateway.stop();
+            embeddedGateway = null;
+        }
     }
 
     @BeforeEach
@@ -448,5 +469,220 @@ class DiscordChatPlatformTest {
         List<Channel> channels = blankPlatform.discovery().listChannels();
 
         assertThat(channels).isEmpty();
+    }
+
+    @Test
+    void inbound_messageCreateFiresEvent() throws Exception {
+        embeddedGateway = new EmbeddedDiscordGateway();
+        embeddedGateway.start();
+
+        wireMock.stubFor(get(urlEqualTo("/gateway"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
+
+        recordingSink = new RecordingSink();
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+
+        inboundConnector.start(recordingSink);
+
+        embeddedGateway.expectConnections(1);
+        await().atMost(Duration.ofSeconds(5)).until(() -> embeddedGateway.getActiveSessionCount() > 0);
+
+        String messageJson = """
+                {
+                  "id": "msg-789",
+                  "channel_id": "channel-456",
+                  "author": {"id": "user-123", "username": "alice", "bot": false},
+                  "content": "Hello Discord",
+                  "type": 0
+                }
+                """;
+
+        embeddedGateway.sendDispatch("MESSAGE_CREATE", messageJson);
+
+        await().atMost(Duration.ofSeconds(2)).until(() -> !recordingSink.messages.isEmpty());
+        assertThat(recordingSink.messages).hasSize(1);
+
+        InboundMessage msg = recordingSink.messages.get(0);
+        assertThat(msg.connectorId()).isEqualTo("discord-inbound");
+        assertThat(msg.connectorType()).isEqualTo("discord");
+        assertThat(msg.externalSenderId()).isEqualTo("user-123");
+        assertThat(msg.externalChannelRef()).isEqualTo("channel-456");
+        assertThat(msg.content()).isEqualTo("Hello Discord");
+        assertThat(msg.metadata().get("discord-message-id")).isEqualTo("msg-789");
+        assertThat(msg.metadata().get("discord-guild-id")).isEqualTo("guild-123");
+    }
+
+    @Test
+    void inbound_systemMessagesFiltered() throws Exception {
+        embeddedGateway = new EmbeddedDiscordGateway();
+        embeddedGateway.start();
+
+        wireMock.stubFor(get(urlEqualTo("/gateway"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
+
+        recordingSink = new RecordingSink();
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+
+        inboundConnector.start(recordingSink);
+        embeddedGateway.expectConnections(1);
+        await().atMost(Duration.ofSeconds(5)).until(() -> embeddedGateway.getActiveSessionCount() > 0);
+
+        // Type 7 = member join (system message)
+        String systemMessageJson = """
+                {
+                  "id": "msg-999",
+                  "channel_id": "channel-456",
+                  "author": {"id": "user-555", "username": "bob", "bot": false},
+                  "content": "",
+                  "type": 7
+                }
+                """;
+
+        embeddedGateway.sendDispatch("MESSAGE_CREATE", systemMessageJson);
+
+        // Wait a bit to ensure it's not delivered
+        Thread.sleep(500);
+        assertThat(recordingSink.messages).isEmpty();
+    }
+
+    @Test
+    void inbound_botMessagesFiltered() throws Exception {
+        embeddedGateway = new EmbeddedDiscordGateway();
+        embeddedGateway.start();
+
+        wireMock.stubFor(get(urlEqualTo("/gateway"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
+
+        recordingSink = new RecordingSink();
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+
+        inboundConnector.start(recordingSink);
+        embeddedGateway.expectConnections(1);
+        await().atMost(Duration.ofSeconds(5)).until(() -> embeddedGateway.getActiveSessionCount() > 0);
+
+        String botMessageJson = """
+                {
+                  "id": "msg-bot",
+                  "channel_id": "channel-456",
+                  "author": {"id": "bot-123", "username": "botuser", "bot": true},
+                  "content": "I am a bot",
+                  "type": 0
+                }
+                """;
+
+        embeddedGateway.sendDispatch("MESSAGE_CREATE", botMessageJson);
+
+        Thread.sleep(500);
+        assertThat(recordingSink.messages).isEmpty();
+    }
+
+    @Test
+    void inbound_blankTokenConnectorInactive() throws Exception {
+        recordingSink = new RecordingSink();
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "", "guild-123");
+
+        inboundConnector.start(recordingSink);
+
+        // Connector should not connect to Gateway with blank token
+        Thread.sleep(500);
+        assertThat(recordingSink.messages).isEmpty();
+    }
+
+    @Test
+    void inbound_blankGuildIdConnectorInactive() throws Exception {
+        recordingSink = new RecordingSink();
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "");
+
+        inboundConnector.start(recordingSink);
+
+        Thread.sleep(500);
+        assertThat(recordingSink.messages).isEmpty();
+    }
+
+    @Test
+    void inbound_presenceCachePopulatedFromGuildCreate() throws Exception {
+        embeddedGateway = new EmbeddedDiscordGateway();
+        embeddedGateway.start();
+
+        wireMock.stubFor(get(urlEqualTo("/gateway"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
+
+        recordingSink = new RecordingSink();
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+
+        inboundConnector.start(recordingSink);
+        embeddedGateway.expectConnections(1);
+        await().atMost(Duration.ofSeconds(5)).until(() -> embeddedGateway.getActiveSessionCount() > 0);
+
+        String guildCreateJson = """
+                {
+                  "id": "guild-123",
+                  "name": "Test Guild",
+                  "presences": [
+                    {"user": {"id": "user-111"}, "status": "online"},
+                    {"user": {"id": "user-222"}, "status": "idle"},
+                    {"user": {"id": "user-333"}, "status": "dnd"}
+                  ]
+                }
+                """;
+
+        embeddedGateway.sendDispatch("GUILD_CREATE", guildCreateJson);
+
+        await().atMost(Duration.ofSeconds(2)).until(() -> presenceCache.get("user-111") != null);
+        assertThat(presenceCache.get("user-111")).isEqualTo("online");
+        assertThat(presenceCache.get("user-222")).isEqualTo("idle");
+        assertThat(presenceCache.get("user-333")).isEqualTo("dnd");
+    }
+
+    @Test
+    void inbound_presenceUpdateUpdatesCacheAfterConnect() throws Exception {
+        embeddedGateway = new EmbeddedDiscordGateway();
+        embeddedGateway.start();
+
+        wireMock.stubFor(get(urlEqualTo("/gateway"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
+
+        recordingSink = new RecordingSink();
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+
+        inboundConnector.start(recordingSink);
+        embeddedGateway.expectConnections(1);
+        await().atMost(Duration.ofSeconds(5)).until(() -> embeddedGateway.getActiveSessionCount() > 0);
+
+        String presenceUpdateJson = """
+                {
+                  "user": {"id": "user-444"},
+                  "status": "offline"
+                }
+                """;
+
+        embeddedGateway.sendDispatch("PRESENCE_UPDATE", presenceUpdateJson);
+
+        await().atMost(Duration.ofSeconds(2)).until(() -> presenceCache.get("user-444") != null);
+        assertThat(presenceCache.get("user-444")).isEqualTo("offline");
+    }
+
+    private static class RecordingSink implements InboundMessageSink {
+        final List<InboundMessage> messages = new ArrayList<>();
+
+        @Override
+        public void receive(InboundMessage message) {
+            messages.add(message);
+        }
     }
 }

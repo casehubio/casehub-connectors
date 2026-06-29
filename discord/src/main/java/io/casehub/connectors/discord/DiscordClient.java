@@ -290,7 +290,7 @@ public class DiscordClient {
                 final ObjectNode overwrite = mapper.createObjectNode();
                 overwrite.put("id", guildId);
                 overwrite.put("type", 0); // role
-                overwrite.put("deny", VIEW_CHANNEL_PERMISSION);
+                overwrite.put("deny", String.valueOf(VIEW_CHANNEL_PERMISSION));
                 overwrites.add(overwrite);
                 body.set("permission_overwrites", overwrites);
             }

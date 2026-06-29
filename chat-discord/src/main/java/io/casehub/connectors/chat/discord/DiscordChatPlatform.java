@@ -12,6 +12,7 @@ import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.chat.degraded.*;
 import io.casehub.connectors.chat.degraded.NoOpMemberManagement;
 import io.casehub.connectors.chat.model.*;
@@ -97,7 +98,7 @@ public class DiscordChatPlatform implements ChatPlatform {
 
     @Override
     public String id() {
-        return "discord";
+        return InboundConnectorTypes.DISCORD;
     }
 
     @Override
@@ -152,7 +153,7 @@ public class DiscordChatPlatform implements ChatPlatform {
 
     // Messaging implementation
     private SendResult sendMessage(final ChatChannelRef channel, final ChatContent content) {
-        final String messageContent = content.markdown() != null ? content.markdown() : content.text();
+        final String messageContent = extractContent(content);
 
         if (messageContent.length() > MAX_CONTENT_LENGTH) {
             return SendResult.failure("Content exceeds Discord's 2000-character limit");
@@ -171,7 +172,7 @@ public class DiscordChatPlatform implements ChatPlatform {
 
     // Threading implementation
     private SendResult sendReply(final ChatMessageRef parent, final ChatContent content) {
-        final String messageContent = content.markdown() != null ? content.markdown() : content.text();
+        final String messageContent = extractContent(content);
 
         if (messageContent.length() > MAX_CONTENT_LENGTH) {
             return SendResult.failure("Content exceeds Discord's 2000-character limit");
@@ -282,6 +283,9 @@ public class DiscordChatPlatform implements ChatPlatform {
         @Override
         public Channel create(final String name, final String topic, final String description, final boolean isPrivate) {
             final DiscordChannel dc = client.createChannel(token, name, topic, 0, false, isPrivate);
+            if (dc == null) {
+                throw new IllegalStateException("Channel creation failed");
+            }
             return toChannel(dc);
         }
 
@@ -319,12 +323,16 @@ public class DiscordChatPlatform implements ChatPlatform {
                 : null;
 
         return new ReceivedMessage(
-                "discord",
+                InboundConnectorTypes.DISCORD,
                 channel,
                 messageRef,
                 parentRef,
                 new MemberRef(dm.author().id()),
                 new ChatContent(dm.content(), null, List.of()),
                 dm.timestamp());
+    }
+
+    private String extractContent(final ChatContent content) {
+        return content.markdown() != null ? content.markdown() : content.text();
     }
 }
