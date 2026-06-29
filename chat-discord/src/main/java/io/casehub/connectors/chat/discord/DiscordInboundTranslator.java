@@ -2,6 +2,7 @@ package io.casehub.connectors.chat.discord;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.chat.model.ChatChannelRef;
 import io.casehub.connectors.chat.model.ChatContent;
@@ -15,7 +16,7 @@ public class DiscordInboundTranslator implements InboundTranslator {
 
     @Override
     public String connectorType() {
-        return "discord";
+        return InboundConnectorTypes.DISCORD;
     }
 
     @Override
@@ -27,7 +28,7 @@ public class DiscordInboundTranslator implements InboundTranslator {
         final ChatMessageRef parentRef = refId != null
                 ? new ChatMessageRef(channel, refId) : null;
         return new ReceivedMessage(
-                "discord",
+                InboundConnectorTypes.DISCORD,
                 channel,
                 messageRef,
                 parentRef,

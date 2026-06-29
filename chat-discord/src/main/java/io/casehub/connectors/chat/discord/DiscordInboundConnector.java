@@ -151,7 +151,7 @@ public class DiscordInboundConnector implements InboundConnector {
 
         InboundMessage msg = new InboundMessage(
                 InboundConnectorIds.DISCORD_INBOUND,
-                "discord",
+                io.casehub.connectors.InboundConnectorTypes.DISCORD,
                 senderId,
                 channelId,
                 content,

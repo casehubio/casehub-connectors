@@ -12,16 +12,24 @@ import io.casehub.connectors.discord.model.DiscordChannel;
 class DiscordDiscoveryTest {
 
     private static final String TOKEN = "test-token";
+    private static final String GUILD_ID = "test-guild-id";
 
     @Test
     void id_returnsDiscord() {
-        final var discovery = new DiscordDiscovery(new StubDiscordClient(), TOKEN);
+        final var discovery = new DiscordDiscovery(new StubDiscordClient(), TOKEN, GUILD_ID);
         assertThat(discovery.id()).isEqualTo("discord");
     }
 
     @Test
     void discover_blankTokenReturnsEmpty() {
-        final var discovery = new DiscordDiscovery(new StubDiscordClient(), "");
+        final var discovery = new DiscordDiscovery(new StubDiscordClient(), "", GUILD_ID);
+        final var result = discovery.discover();
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void discover_blankGuildIdReturnsEmpty() {
+        final var discovery = new DiscordDiscovery(new StubDiscordClient(), TOKEN, "");
         final var result = discovery.discover();
         assertThat(result).isEmpty();
     }
@@ -34,7 +42,7 @@ class DiscordDiscoveryTest {
                 new DiscordChannel("th1", "thread-1", "A thread", 11, null, List.of())
         );
         final var client = new StubDiscordClient(channels);
-        final var discovery = new DiscordDiscovery(client, TOKEN);
+        final var discovery = new DiscordDiscovery(client, TOKEN, GUILD_ID);
         final var result = discovery.discover();
 
         assertThat(result).hasSize(3);
@@ -54,7 +62,7 @@ class DiscordDiscoveryTest {
                 new DiscordChannel("forum", "my-forum", "Forum channel", 15, null, List.of())
         );
         final var client = new StubDiscordClient(channels);
-        final var discovery = new DiscordDiscovery(client, TOKEN);
+        final var discovery = new DiscordDiscovery(client, TOKEN, GUILD_ID);
         final var result = discovery.discover();
 
         assertThat(result).hasSize(1);
@@ -64,14 +72,14 @@ class DiscordDiscoveryTest {
 
     @Test
     void discover_nullClientResponseReturnsEmpty() {
-        final var discovery = new DiscordDiscovery(new StubDiscordClient(null), TOKEN);
+        final var discovery = new DiscordDiscovery(new StubDiscordClient(null), TOKEN, GUILD_ID);
         final var result = discovery.discover();
         assertThat(result).isEmpty();
     }
 
     @Test
     void discover_emptyClientResponseReturnsEmpty() {
-        final var discovery = new DiscordDiscovery(new StubDiscordClient(List.of()), TOKEN);
+        final var discovery = new DiscordDiscovery(new StubDiscordClient(List.of()), TOKEN, GUILD_ID);
         final var result = discovery.discover();
         assertThat(result).isEmpty();
     }

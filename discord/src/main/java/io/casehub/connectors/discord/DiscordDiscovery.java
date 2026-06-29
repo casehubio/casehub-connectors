@@ -27,13 +27,17 @@ public class DiscordDiscovery implements ConnectorDiscovery {
 
     private final DiscordClient client;
     private final String token;
+    private final String guildId;
 
     @Inject
     DiscordDiscovery(final DiscordClient client,
                      @ConfigProperty(name = "casehub.discord.token",
-                                     defaultValue = "") final String token) {
+                                     defaultValue = "") final String token,
+                     @ConfigProperty(name = "casehub.discord.guild-id",
+                                     defaultValue = "") final String guildId) {
         this.client = client;
         this.token = token;
+        this.guildId = guildId;
     }
 
     @Override
@@ -43,7 +47,7 @@ public class DiscordDiscovery implements ConnectorDiscovery {
 
     @Override
     public List<DiscoveredTarget> discover() {
-        if (token.isBlank()) {
+        if (token.isBlank() || guildId.isBlank()) {
             return List.of();
         }
         final var channels = client.listGuildChannels(token);
