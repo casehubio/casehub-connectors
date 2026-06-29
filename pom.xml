@@ -31,6 +31,7 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
     <module>chat-spi</module>
     <module>chat-ref</module>
     <module>chat-irc</module>
+    <module>discord</module>
   </modules>
 
   <properties>
