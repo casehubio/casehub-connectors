@@ -6,11 +6,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import io.casehub.connectors.chat.degraded.*;
 import io.casehub.connectors.chat.degraded.NoOpMemberManagement;
 import io.casehub.connectors.chat.model.*;
 import io.casehub.connectors.chat.spi.*;
@@ -41,15 +43,15 @@ public class DiscordChatPlatform implements ChatPlatform {
     private final String token;
     private final String guildId;
 
-    private final Messaging messaging;
-    private final Threading threading;
-    private final Discovery discovery;
-    private final Reactions reactions;
-    private final Presence presence;
-    private final Members members;
-    private final ChannelManagement channelManagement;
+    private Messaging messaging;
+    private Threading threading;
+    private Discovery discovery;
+    private Reactions reactions;
+    private Presence presence;
+    private Members members;
+    private ChannelManagement channelManagement;
     private final MemberManagement memberManagement = new NoOpMemberManagement();
-    private final MessageHistory messageHistory;
+    private MessageHistory messageHistory;
 
     /**
      * CDI constructor.
@@ -64,15 +66,33 @@ public class DiscordChatPlatform implements ChatPlatform {
         this.presenceCache = presenceCache;
         this.token = token;
         this.guildId = guildId;
+    }
 
-        this.messaging = this::sendMessage;
-        this.threading = this::sendReply;
-        this.discovery = this::listChannels;
-        this.reactions = new DiscordReactions();
-        this.presence = new DiscordPresence();
-        this.members = this::listMembers;
-        this.channelManagement = new DiscordChannelManagement();
-        this.messageHistory = this::getMessageHistory;
+    /**
+     * Initialize capabilities. If token or guild-id is blank, use degraded/no-op implementations.
+     */
+    @PostConstruct
+    void init() {
+        if (token.isBlank() || guildId.isBlank()) {
+            LOG.warning("discord: token or guild-id not configured, platform inactive");
+            this.messaging = (channel, content) -> SendResult.failure("Discord not configured");
+            this.threading = new ChannelFallbackThreading(this.messaging);
+            this.discovery = new EmptyDiscovery();
+            this.reactions = new NoOpReactions();
+            this.presence = new UnknownPresence();
+            this.members = new EmptyMembers();
+            this.channelManagement = new NoOpChannelManagement();
+            this.messageHistory = new EmptyMessageHistory();
+        } else {
+            this.messaging = this::sendMessage;
+            this.threading = this::sendReply;
+            this.discovery = this::listChannels;
+            this.reactions = new DiscordReactions();
+            this.presence = new DiscordPresence();
+            this.members = this::listMembers;
+            this.channelManagement = new DiscordChannelManagement();
+            this.messageHistory = this::getMessageHistory;
+        }
     }
 
     @Override
@@ -277,6 +297,11 @@ public class DiscordChatPlatform implements ChatPlatform {
 
     // MessageHistory implementation
     private List<ReceivedMessage> getMessageHistory(final ChatChannelRef channel, final Instant since) {
+        if (since.toEpochMilli() < DISCORD_EPOCH) {
+            LOG.warning("MessageHistory: 'since' timestamp before Discord epoch, returning empty");
+            return List.of();
+        }
+
         final long syntheticSnowflake = (since.toEpochMilli() - DISCORD_EPOCH) << 22;
         final String afterId = String.valueOf(syntheticSnowflake);
 

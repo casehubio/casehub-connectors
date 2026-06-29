@@ -54,6 +54,7 @@ class DiscordChatPlatformTest {
 
         presenceCache = new DiscordGatewayPresenceCache();
         platform = new DiscordChatPlatform(client, presenceCache, "test-token", "test-guild-123");
+        platform.init(); // Manually call @PostConstruct since we're not using CDI
     }
 
     @Test
@@ -413,5 +414,39 @@ class DiscordChatPlatformTest {
         assertThat(messages.get(1).messageRef().messageId()).isEqualTo("msg-2");
         assertThat(messages.get(1).parentRef()).isNotNull();
         assertThat(messages.get(1).parentRef().messageId()).isEqualTo("msg-1");
+    }
+
+    @Test
+    void messageHistory_sinceBeforeEpochReturnsEmpty() {
+        ChatChannelRef channel = new ChatChannelRef("chan-123");
+        Instant preEpoch = Instant.parse("2010-01-01T00:00:00Z");
+
+        List<ReceivedMessage> messages = platform.messageHistory().messages(channel, preEpoch);
+
+        assertThat(messages).isEmpty();
+    }
+
+    @Test
+    void messaging_blankTokenReturnsFailure() throws Exception {
+        DiscordChatPlatform blankPlatform = new DiscordChatPlatform(client, presenceCache, "", "test-guild-123");
+        blankPlatform.init();
+
+        ChatChannelRef channel = new ChatChannelRef("chan-123");
+        ChatContent content = new ChatContent("Hello", null, List.of());
+
+        SendResult result = blankPlatform.messaging().send(channel, content);
+
+        assertThat(result.ok()).isFalse();
+        assertThat(result.error()).contains("not configured");
+    }
+
+    @Test
+    void discovery_blankGuildIdReturnsEmpty() throws Exception {
+        DiscordChatPlatform blankPlatform = new DiscordChatPlatform(client, presenceCache, "test-token", "");
+        blankPlatform.init();
+
+        List<Channel> channels = blankPlatform.discovery().listChannels();
+
+        assertThat(channels).isEmpty();
     }
 }
