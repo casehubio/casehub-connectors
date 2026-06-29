@@ -164,7 +164,7 @@ public class DiscordGateway {
                 ? resumeGatewayUrl : gatewayUrl;
 
         // Append query parameters if not already present
-        String connectUrl = url.contains("?") ? url : url + "/?v=10&encoding=json";
+        String connectUrl = url.contains("?") ? url : url + "?v=10&encoding=json";
 
         closeFuture = new CompletableFuture<>();
 
