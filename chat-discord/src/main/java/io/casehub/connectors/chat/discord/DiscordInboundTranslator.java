@@ -33,7 +33,7 @@ public class DiscordInboundTranslator implements InboundTranslator {
                 messageRef,
                 parentRef,
                 new MemberRef(msg.externalSenderId()),
-                new ChatContent(msg.content()),
+                new ChatContent(msg.content(), null, msg.attachments()),
                 msg.receivedAt());
     }
 }

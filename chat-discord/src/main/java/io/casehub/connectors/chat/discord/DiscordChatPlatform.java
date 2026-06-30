@@ -1,6 +1,7 @@
 package io.casehub.connectors.chat.discord;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -12,6 +13,7 @@ import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import io.casehub.connectors.Attachment;
 import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.chat.degraded.*;
 import io.casehub.connectors.chat.degraded.NoOpMemberManagement;
@@ -322,13 +324,21 @@ public class DiscordChatPlatform implements ChatPlatform {
                 ? new ChatMessageRef(channel, dm.referencedMessageId())
                 : null;
 
+        final List<Attachment> attachments = new ArrayList<>();
+        for (final DiscordAttachment da : dm.attachments()) {
+            final Attachment downloaded = client.downloadAttachment(da);
+            if (downloaded != null) {
+                attachments.add(downloaded);
+            }
+        }
+
         return new ReceivedMessage(
                 InboundConnectorTypes.DISCORD,
                 channel,
                 messageRef,
                 parentRef,
                 new MemberRef(dm.author().id()),
-                new ChatContent(dm.content(), null, List.of()),
+                new ChatContent(dm.content(), null, attachments),
                 dm.timestamp());
     }
 

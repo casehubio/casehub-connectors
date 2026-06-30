@@ -9,6 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.casehub.connectors.Attachment;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.chat.model.ReceivedMessage;
 
@@ -94,5 +95,21 @@ class DiscordInboundTranslatorTest {
         ReceivedMessage received = translator.translate(inbound);
 
         assertThat(received.parentRef()).isNull();
+    }
+
+    @Test
+    void translate_forwardsAttachments() {
+        Attachment att = new Attachment("file.pdf", "application/pdf", new byte[]{1, 2, 3});
+        InboundMessage inbound = new InboundMessage(
+                "discord-inbound", "discord", "user-123", "channel-456",
+                "See attached", List.of(att), Instant.now(),
+                Map.of("discord-message-id", "msg-789", "discord-guild-id", "guild-999"),
+                null);
+
+        ReceivedMessage received = translator.translate(inbound);
+
+        assertThat(received.content().attachments()).hasSize(1);
+        assertThat(received.content().attachments().get(0).filename()).isEqualTo("file.pdf");
+        assertThat(received.content().attachments().get(0).contentType()).isEqualTo("application/pdf");
     }
 }

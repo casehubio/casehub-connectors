@@ -73,6 +73,14 @@ class DiscordChatPlatformTest {
         guildIdField.setAccessible(true);
         guildIdField.set(client, "test-guild-123");
 
+        var allowedCdnHostsField = DiscordClient.class.getDeclaredField("allowedCdnHosts");
+        allowedCdnHostsField.setAccessible(true);
+        allowedCdnHostsField.set(client, java.util.Set.of("cdn.discordapp.com", "media.discordapp.net", "localhost"));
+
+        var maxAttachmentBytesField = DiscordClient.class.getDeclaredField("maxAttachmentBytes");
+        maxAttachmentBytesField.setAccessible(true);
+        maxAttachmentBytesField.set(client, 8388608L); // 8 MB
+
         presenceCache = new DiscordGatewayPresenceCache();
         platform = new DiscordChatPlatform(client, presenceCache, "test-token", "test-guild-123");
         platform.init(); // Manually call @PostConstruct since we're not using CDI
@@ -675,6 +683,84 @@ class DiscordChatPlatformTest {
 
         await().atMost(Duration.ofSeconds(2)).until(() -> presenceCache.get("user-444") != null);
         assertThat(presenceCache.get("user-444")).isEqualTo("offline");
+    }
+
+    @Test
+    void messageHistory_downloadsAttachments() {
+        // Stub message with attachment metadata
+        wireMock.stubFor(get(urlMatching("/channels/chan-123/messages\\?limit=100&after=\\d+"))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{
+                                  "id": "msg-att",
+                                  "channel_id": "chan-123",
+                                  "content": "See file",
+                                  "author": {"id": "u1", "username": "alice"},
+                                  "timestamp": "2026-06-29T10:00:00Z",
+                                  "type": 0,
+                                  "attachments": [{
+                                    "id": "att-1",
+                                    "filename": "report.pdf",
+                                    "content_type": "application/pdf",
+                                    "size": 1024,
+                                    "url": "%s/cdn/report.pdf"
+                                  }]
+                                }]
+                                """.formatted(wireMock.baseUrl()))));
+
+        // Stub CDN download
+        wireMock.stubFor(get(urlEqualTo("/cdn/report.pdf"))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Length", "3")
+                        .withBody(new byte[]{1, 2, 3})));
+
+        ChatChannelRef channel = new ChatChannelRef("chan-123");
+        Instant since = Instant.parse("2026-06-29T09:00:00Z");
+
+        List<ReceivedMessage> messages = platform.messageHistory().messages(channel, since);
+
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).content().attachments()).hasSize(1);
+        assertThat(messages.get(0).content().attachments().get(0).filename()).isEqualTo("report.pdf");
+        assertThat(messages.get(0).content().attachments().get(0).content()).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void messageHistory_attachmentDownloadFailure_gracefulSkip() {
+        wireMock.stubFor(get(urlMatching("/channels/chan-123/messages\\?limit=100&after=\\d+"))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{
+                                  "id": "msg-att2",
+                                  "channel_id": "chan-123",
+                                  "content": "Bad file",
+                                  "author": {"id": "u1", "username": "alice"},
+                                  "timestamp": "2026-06-29T10:00:00Z",
+                                  "type": 0,
+                                  "attachments": [{
+                                    "id": "att-2",
+                                    "filename": "missing.pdf",
+                                    "content_type": "application/pdf",
+                                    "size": 1024,
+                                    "url": "%s/cdn/missing.pdf"
+                                  }]
+                                }]
+                                """.formatted(wireMock.baseUrl()))));
+
+        // CDN returns 403 (expired URL)
+        wireMock.stubFor(get(urlEqualTo("/cdn/missing.pdf"))
+                .willReturn(aResponse().withStatus(403)));
+
+        ChatChannelRef channel = new ChatChannelRef("chan-123");
+        Instant since = Instant.parse("2026-06-29T09:00:00Z");
+
+        List<ReceivedMessage> messages = platform.messageHistory().messages(channel, since);
+
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).content().attachments()).isEmpty();
+        assertThat(messages.get(0).content().text()).isEqualTo("Bad file");
     }
 
     private static class RecordingSink implements InboundMessageSink {
