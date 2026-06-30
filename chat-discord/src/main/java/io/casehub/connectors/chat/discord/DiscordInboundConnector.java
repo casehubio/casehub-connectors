@@ -1,6 +1,7 @@
 package io.casehub.connectors.chat.discord;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -13,14 +14,17 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import io.casehub.connectors.Attachment;
 import io.casehub.connectors.InboundConnector;
 import io.casehub.connectors.InboundConnectorIds;
+import io.casehub.connectors.InboundConnectorTypes;
 import io.casehub.connectors.InboundMessage;
 import io.casehub.connectors.InboundMessageSink;
 import io.casehub.connectors.discord.DiscordClient;
 import io.casehub.connectors.discord.DiscordGateway;
 import io.casehub.connectors.discord.DiscordGatewayPresenceCache;
 import io.casehub.connectors.discord.GatewayEventListener;
+import io.casehub.connectors.discord.model.DiscordAttachment;
 
 @ApplicationScoped
 public class DiscordInboundConnector implements InboundConnector {
@@ -96,8 +100,8 @@ public class DiscordInboundConnector implements InboundConnector {
         }
     }
 
-    private void handleEvent(final String eventType, final JsonNode data,
-                             final InboundMessageSink sink) {
+    void handleEvent(final String eventType, final JsonNode data,
+                     final InboundMessageSink sink) {
         if (stopping) return;
 
         try {
@@ -120,42 +124,84 @@ public class DiscordInboundConnector implements InboundConnector {
     }
 
     private void handleMessageCreate(final JsonNode data, final InboundMessageSink sink) {
-        // Filter bot messages
         JsonNode author = data.get("author");
         if (author != null && author.has("bot") && author.get("bot").asBoolean()) {
             return;
         }
 
-        // Filter to types 0 (DEFAULT) and 19 (REPLY) only
         int type = data.has("type") ? data.get("type").asInt() : 0;
         if (type != 0 && type != 19) {
-            return; // skip system messages
+            return;
         }
 
-        String messageId = data.get("id").asText();
-        String channelId = data.get("channel_id").asText();
-        String content = data.has("content") ? data.get("content").asText() : "";
-        String senderId = author.get("id").asText();
+        final List<DiscordAttachment> discordAttachments =
+                client.parseAttachments(data.get("attachments"));
 
-        Map<String, String> metadata = new java.util.HashMap<>();
+        if (discordAttachments.isEmpty()) {
+            deliverMessage(data, List.of(), 0, 0, sink);
+        } else {
+            Thread.ofVirtual().name("discord-attachment-download").start(() -> {
+                try {
+                    downloadAndDeliver(data, discordAttachments, sink);
+                } catch (final Exception e) {
+                    LOG.log(Level.WARNING,
+                            "discord-inbound: attachment download failed, delivering without attachments", e);
+                    deliverMessage(data, List.of(), discordAttachments.size(),
+                            discordAttachments.size(), sink);
+                }
+            });
+        }
+    }
+
+    private void downloadAndDeliver(final JsonNode data,
+                                    final List<DiscordAttachment> discordAttachments,
+                                    final InboundMessageSink sink) {
+        final List<Attachment> downloaded = new ArrayList<>();
+        int failures = 0;
+        for (final DiscordAttachment da : discordAttachments) {
+            final Attachment att = client.downloadAttachment(da);
+            if (att != null) {
+                downloaded.add(att);
+            } else {
+                failures++;
+            }
+        }
+        deliverMessage(data, downloaded, discordAttachments.size(), failures, sink);
+    }
+
+    private void deliverMessage(final JsonNode data, final List<Attachment> attachments,
+                                final int attachmentCount, final int downloadFailures,
+                                final InboundMessageSink sink) {
+        final JsonNode author = data.get("author");
+        final String messageId = data.get("id").asText();
+        final String channelId = data.get("channel_id").asText();
+        final String content = data.has("content") ? data.get("content").asText() : "";
+        final String senderId = author.get("id").asText();
+        final int type = data.has("type") ? data.get("type").asInt() : 0;
+
+        final Map<String, String> metadata = new java.util.HashMap<>();
         metadata.put("discord-message-id", messageId);
         metadata.put("discord-guild-id", guildId);
 
-        // Extract reply reference if present (type 19)
         if (type == 19 && data.has("message_reference")) {
-            JsonNode ref = data.get("message_reference");
+            final JsonNode ref = data.get("message_reference");
             if (ref.has("message_id")) {
                 metadata.put("discord-reference-id", ref.get("message_id").asText());
             }
         }
 
-        InboundMessage msg = new InboundMessage(
+        if (attachmentCount > 0) {
+            metadata.put("discord-attachment-count", String.valueOf(attachmentCount));
+            metadata.put("discord-attachment-download-failures", String.valueOf(downloadFailures));
+        }
+
+        final InboundMessage msg = new InboundMessage(
                 InboundConnectorIds.DISCORD_INBOUND,
-                io.casehub.connectors.InboundConnectorTypes.DISCORD,
+                InboundConnectorTypes.DISCORD,
                 senderId,
                 channelId,
                 content,
-                List.of(), // attachments deferred
+                attachments,
                 Instant.now(),
                 metadata,
                 null);
@@ -168,7 +214,6 @@ public class DiscordInboundConnector implements InboundConnector {
     }
 
     private void handleGuildCreate(final JsonNode data) {
-        // Seed presence cache from GUILD_CREATE
         if (!data.has("presences")) {
             return;
         }

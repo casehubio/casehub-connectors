@@ -7,9 +7,11 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="casehub-connectors-slack-bot" />
+        <module name="casehub-connectors-chat-discord" />
         <module name="casehub-connectors-chat-ref" />
         <module name="casehub-connectors-email-inbound" />
         <module name="casehub-connectors-chat-spi" />
+        <module name="casehub-connectors-discord" />
         <module name="casehub-connectors-mcp" />
         <module name="casehub-connectors-chat-irc" />
         <module name="casehub-connectors-email" />
@@ -20,5 +22,20 @@
     <bytecodeTargetLevel>
       <module name="casehub-connectors" target="21" />
     </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="casehub-connectors-chat-discord" options="-parameters" />
+      <module name="casehub-connectors-chat-irc" options="-parameters" />
+      <module name="casehub-connectors-chat-ref" options="-parameters" />
+      <module name="casehub-connectors-chat-spi" options="-parameters" />
+      <module name="casehub-connectors-core" options="-parameters" />
+      <module name="casehub-connectors-discord" options="-parameters" />
+      <module name="casehub-connectors-email" options="-parameters" />
+      <module name="casehub-connectors-email-inbound" options="-parameters" />
+      <module name="casehub-connectors-mcp" options="-parameters" />
+      <module name="casehub-connectors-slack-bot" options="-parameters" />
+      <module name="casehub-connectors-webhook" options="-parameters" />
+    </option>
   </component>
 </project>

@@ -2,3 +2,5 @@ target/
 *.class
 *.jar
 wksp
+
+.idea/

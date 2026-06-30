@@ -1,5 +1,7 @@
 package io.casehub.connectors.discord;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpRequest;
@@ -9,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import io.casehub.connectors.Attachment;
 import io.casehub.connectors.discord.model.*;
 import io.casehub.connectors.http.HttpHelper;
 
@@ -43,6 +47,8 @@ public class DiscordClient {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final int MAX_PAGES = 50;
     private static final long VIEW_CHANNEL_PERMISSION = 1024L; // 1 << 10
+    Set<String> allowedCdnHosts = Set.of(
+            "cdn.discordapp.com", "media.discordapp.net");
 
     private final ObjectMapper mapper;
 
@@ -52,6 +58,10 @@ public class DiscordClient {
 
     @ConfigProperty(name = "casehub.discord.guild-id", defaultValue = "")
     String guildId;
+
+    @ConfigProperty(name = "casehub.discord.attachment.max-bytes",
+                    defaultValue = "8388608")
+    long maxAttachmentBytes;
 
     public DiscordClient() {
         this.mapper = new ObjectMapper();
@@ -67,9 +77,13 @@ public class DiscordClient {
      * @return the result of the API call
      */
     public PostResult sendMessage(final String token, final String channelId, final String content) {
+        return sendMessage(token, channelId, content, List.of());
+    }
+
+    public PostResult sendMessage(final String token, final String channelId,
+                                  final String content, final List<DiscordEmbed> embeds) {
         try {
-            final ObjectNode body = mapper.createObjectNode();
-            body.put("content", content);
+            final ObjectNode body = buildMessageBody(content, embeds);
 
             final HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(apiBaseUrl + "/channels/" + channelId + "/messages"))
@@ -98,9 +112,14 @@ public class DiscordClient {
      */
     public PostResult sendReply(final String token, final String channelId,
                                 final String content, final String replyToMessageId) {
+        return sendReply(token, channelId, content, replyToMessageId, List.of());
+    }
+
+    public PostResult sendReply(final String token, final String channelId,
+                                final String content, final String replyToMessageId,
+                                final List<DiscordEmbed> embeds) {
         try {
-            final ObjectNode body = mapper.createObjectNode();
-            body.put("content", content);
+            final ObjectNode body = buildMessageBody(content, embeds);
 
             final ObjectNode messageReference = mapper.createObjectNode();
             messageReference.put("message_id", replyToMessageId);
@@ -606,6 +625,124 @@ public class DiscordClient {
         }
     }
 
+    public String guildId() {
+        return guildId;
+    }
+
+    private ObjectNode buildMessageBody(final String content,
+                                        final List<DiscordEmbed> embeds) {
+        final ObjectNode body = mapper.createObjectNode();
+        if (content != null && !content.isEmpty()) {
+            body.put("content", content);
+        }
+        if (embeds != null && !embeds.isEmpty()) {
+            final ArrayNode embedsArray = body.putArray("embeds");
+            for (final DiscordEmbed embed : embeds) {
+                serializeEmbed(embedsArray.addObject(), embed);
+            }
+        }
+        return body;
+    }
+
+    private void serializeEmbed(final ObjectNode node, final DiscordEmbed embed) {
+        if (embed.title() != null) node.put("title", embed.title());
+        if (embed.description() != null) node.put("description", embed.description());
+        if (embed.url() != null) node.put("url", embed.url());
+        if (embed.color() != null) node.put("color", embed.color());
+        if (!embed.fields().isEmpty()) {
+            final ArrayNode fields = node.putArray("fields");
+            for (final DiscordEmbed.Field f : embed.fields()) {
+                final ObjectNode fn = fields.addObject();
+                fn.put("name", f.name());
+                fn.put("value", f.value());
+                fn.put("inline", f.inline());
+            }
+        }
+        if (embed.thumbnailUrl() != null)
+            node.putObject("thumbnail").put("url", embed.thumbnailUrl());
+        if (embed.imageUrl() != null)
+            node.putObject("image").put("url", embed.imageUrl());
+        if (embed.footer() != null)
+            node.putObject("footer").put("text", embed.footer().text());
+        if (embed.author() != null)
+            node.putObject("author").put("name", embed.author().name());
+    }
+
+    /**
+     * Downloads an attachment from a Discord CDN URL.
+     *
+     * @param attachment the attachment metadata
+     * @return the downloaded attachment, or {@code null} on failure
+     */
+    public Attachment downloadAttachment(final DiscordAttachment attachment) {
+        return downloadAttachment(attachment, allowedCdnHosts);
+    }
+
+    Attachment downloadAttachment(final DiscordAttachment attachment,
+                                  final Set<String> allowedHosts) {
+        final URI uri;
+        try {
+            uri = URI.create(attachment.url());
+        } catch (final Exception e) {
+            LOG.warning("DiscordClient: invalid attachment URL — " + attachment.url());
+            return null;
+        }
+        if (!allowedHosts.contains(uri.getHost())) {
+            LOG.warning("DiscordClient: attachment URL host rejected (SSRF defense) — " + uri.getHost());
+            return null;
+        }
+
+        try {
+            final HttpRequest request = HttpRequest.newBuilder()
+                    .uri(uri).timeout(REQUEST_TIMEOUT).GET().build();
+            final HttpResponse<InputStream> response = HttpHelper.CLIENT.send(
+                    request, HttpResponse.BodyHandlers.ofInputStream());
+
+            if (response.statusCode() == 403) {
+                LOG.warning("DiscordClient: CDN 403 (expired URL) — " + attachment.filename());
+                return null;
+            }
+            if (response.statusCode() != 200) {
+                LOG.warning("DiscordClient: attachment download HTTP " + response.statusCode());
+                return null;
+            }
+
+            final long contentLength = response.headers()
+                    .firstValueAsLong("Content-Length").orElse(-1);
+            if (contentLength > maxAttachmentBytes) {
+                LOG.warning(String.format(
+                        "DiscordClient: attachment too large (%d bytes, limit %d) — %s",
+                        contentLength, maxAttachmentBytes, attachment.filename()));
+                return null;
+            }
+
+            try (final InputStream in = response.body()) {
+                final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                final byte[] buf = new byte[8192];
+                long total = 0;
+                int read;
+                while ((read = in.read(buf)) != -1) {
+                    total += read;
+                    if (total > maxAttachmentBytes) {
+                        LOG.warning(String.format(
+                                "DiscordClient: attachment stream exceeded limit (%d bytes) — %s",
+                                maxAttachmentBytes, attachment.filename()));
+                        return null;
+                    }
+                    out.write(buf, 0, read);
+                }
+                return new Attachment(attachment.filename(),
+                        attachment.contentType(), out.toByteArray());
+            }
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (final Exception e) {
+            LOG.warning("DiscordClient: attachment download error — " + e.getMessage());
+            return null;
+        }
+    }
+
     private PostResult sendWithRetry(final HttpRequest request) {
         try {
             final HttpResponse<String> response =
@@ -657,6 +794,28 @@ public class DiscordClient {
         }
     }
 
+    /**
+     * Parses a Discord {@code attachments[]} JSON array into metadata records.
+     *
+     * @param attachmentsArray the JSON array node, or null
+     * @return list of attachment metadata; never null
+     */
+    public List<DiscordAttachment> parseAttachments(final JsonNode attachmentsArray) {
+        if (attachmentsArray == null || !attachmentsArray.isArray() || attachmentsArray.isEmpty()) {
+            return List.of();
+        }
+        final List<DiscordAttachment> result = new ArrayList<>();
+        for (final JsonNode node : attachmentsArray) {
+            result.add(new DiscordAttachment(
+                    node.get("id").asText(),
+                    node.has("filename") ? node.get("filename").asText() : null,
+                    node.has("content_type") ? node.get("content_type").asText() : null,
+                    node.has("size") ? node.get("size").asLong() : 0,
+                    node.has("url") ? node.get("url").asText() : null));
+        }
+        return List.copyOf(result);
+    }
+
     private DiscordMessage parseMessage(final JsonNode node) {
         final JsonNode authorNode = node.get("author");
         final DiscordUser author = new DiscordUser(
@@ -674,6 +833,9 @@ public class DiscordClient {
             referencedMessageId = null;
         }
 
+        final List<DiscordAttachment> attachments = parseAttachments(
+                node.has("attachments") ? node.get("attachments") : null);
+
         return new DiscordMessage(
                 node.get("id").asText(),
                 node.get("channel_id").asText(),
@@ -681,7 +843,8 @@ public class DiscordClient {
                 node.get("content").asText(),
                 Instant.parse(node.get("timestamp").asText()),
                 referencedMessageId,
-                node.get("type").asInt()
+                node.get("type").asInt(),
+                attachments
         );
     }
 

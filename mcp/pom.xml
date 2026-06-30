@@ -35,6 +35,11 @@ classpath (casehubio/qhorus#249).</description>
       <version>0.2-SNAPSHOT</version>
     </dependency>
     <dependency>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-connectors-discord</artifactId>
+      <version>0.2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>io.quarkiverse.mcp</groupId>
       <artifactId>quarkus-mcp-server-core</artifactId>
       <version>${quarkus-mcp-server.version}</version>

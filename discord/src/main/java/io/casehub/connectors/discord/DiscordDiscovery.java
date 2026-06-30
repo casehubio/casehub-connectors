@@ -23,7 +23,7 @@ public class DiscordDiscovery implements ConnectorDiscovery {
 
     public static final String ID = "discord";
 
-    private static final Set<Integer> TEXT_CHANNEL_TYPES = Set.of(0, 5, 10, 11, 12);
+    public static final Set<Integer> TEXT_CHANNEL_TYPES = Set.of(0, 5, 10, 11, 12);
 
     private final DiscordClient client;
     private final String token;

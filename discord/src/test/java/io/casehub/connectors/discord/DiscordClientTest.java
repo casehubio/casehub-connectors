@@ -5,7 +5,12 @@ import static org.assertj.core.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.casehub.connectors.Attachment;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +35,7 @@ class DiscordClientTest {
         client = new DiscordClient();
         client.apiBaseUrl = wireMock.baseUrl();
         client.guildId = GUILD_ID;
+        client.maxAttachmentBytes = 8_388_608;
     }
 
     @AfterEach
@@ -362,5 +368,238 @@ class DiscordClientTest {
         final String gatewayUrl = client.getGatewayUrl(TOKEN);
 
         assertThat(gatewayUrl).isEqualTo("wss://gateway.discord.gg/");
+    }
+
+    // ── Attachment parsing ────────────────────────────────────────────────────
+
+    @Test
+    void parseAttachments_parsesArrayWithMultipleAttachments() throws Exception {
+        final ObjectMapper mapper = new ObjectMapper();
+        final String json = """
+                [
+                  {"id":"att1","filename":"image.png","content_type":"image/png","size":12345,"url":"https://cdn.discordapp.com/attachments/1/2/image.png"},
+                  {"id":"att2","filename":"doc.pdf","content_type":"application/pdf","size":67890,"url":"https://cdn.discordapp.com/attachments/1/2/doc.pdf"}
+                ]""";
+        final JsonNode array = mapper.readTree(json);
+
+        final List<DiscordAttachment> result = client.parseAttachments(array);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).id()).isEqualTo("att1");
+        assertThat(result.get(0).filename()).isEqualTo("image.png");
+        assertThat(result.get(0).contentType()).isEqualTo("image/png");
+        assertThat(result.get(0).size()).isEqualTo(12345L);
+        assertThat(result.get(0).url()).isEqualTo("https://cdn.discordapp.com/attachments/1/2/image.png");
+        assertThat(result.get(1).id()).isEqualTo("att2");
+    }
+
+    @Test
+    void parseAttachments_emptyArray_returnsEmptyList() throws Exception {
+        final ObjectMapper mapper = new ObjectMapper();
+        final JsonNode array = mapper.readTree("[]");
+
+        final List<DiscordAttachment> result = client.parseAttachments(array);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void parseAttachments_nullArray_returnsEmptyList() {
+        final List<DiscordAttachment> result = client.parseAttachments(null);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getMessages_includesAttachments() {
+        wireMock.stubFor(get(urlMatching("/channels/ch1/messages\\?limit=1"))
+                .willReturn(okJson("""
+                        [{"id":"msg1","channel_id":"ch1","content":"hello",
+                          "timestamp":"2026-06-01T00:00:00Z","type":0,
+                          "author":{"id":"u1","username":"user1","bot":false},
+                          "attachments":[{"id":"a1","filename":"f.png","content_type":"image/png","size":100,"url":"https://cdn.discordapp.com/a1"}]}]
+                        """)));
+
+        final List<DiscordMessage> msgs = client.getMessages(TOKEN, "ch1", null, 1);
+
+        assertThat(msgs).hasSize(1);
+        assertThat(msgs.get(0).attachments()).hasSize(1);
+        assertThat(msgs.get(0).attachments().get(0).filename()).isEqualTo("f.png");
+    }
+
+    @Test
+    void getMessages_noAttachmentsField_returnsEmptyList() {
+        wireMock.stubFor(get(urlMatching("/channels/ch1/messages\\?limit=1"))
+                .willReturn(okJson("""
+                        [{"id":"msg1","channel_id":"ch1","content":"hello",
+                          "timestamp":"2026-06-01T00:00:00Z","type":0,
+                          "author":{"id":"u1","username":"user1","bot":false}}]
+                        """)));
+
+        final List<DiscordMessage> msgs = client.getMessages(TOKEN, "ch1", null, 1);
+
+        assertThat(msgs).hasSize(1);
+        assertThat(msgs.get(0).attachments()).isEmpty();
+    }
+
+    // ── Attachment downloading ────────────────────────────────────────────────
+
+    @Test
+    void downloadAttachment_success() {
+        final byte[] content = "hello world".getBytes();
+        wireMock.stubFor(get(urlPathEqualTo("/cdn/file.png"))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Length", String.valueOf(content.length))
+                        .withBody(content)));
+
+        final var att = new DiscordAttachment("a1", "file.png", "image/png",
+                content.length, wireMock.baseUrl() + "/cdn/file.png");
+        final Attachment result = client.downloadAttachment(att, Set.of("localhost"));
+
+        assertThat(result).isNotNull();
+        assertThat(result.filename()).isEqualTo("file.png");
+        assertThat(result.contentType()).isEqualTo("image/png");
+        assertThat(result.content()).isEqualTo(content);
+    }
+
+    @Test
+    void downloadAttachment_ssrfRejected_nonAllowedHost() {
+        final var att = new DiscordAttachment("a1", "f.png", "image/png",
+                100, "https://evil.com/payload");
+
+        final Attachment result = client.downloadAttachment(att);
+
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void downloadAttachment_contentLengthExceedsLimit_returnsNull() {
+        wireMock.stubFor(get(urlPathEqualTo("/cdn/huge.bin"))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Length", "999999999")));
+
+        final var att = new DiscordAttachment("a1", "huge.bin", "application/octet-stream",
+                999999999, wireMock.baseUrl() + "/cdn/huge.bin");
+        final Attachment result = client.downloadAttachment(att, Set.of("localhost"));
+
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void downloadAttachment_cdn403_returnsNull() {
+        wireMock.stubFor(get(urlPathEqualTo("/cdn/expired.png"))
+                .willReturn(aResponse().withStatus(403)));
+
+        final var att = new DiscordAttachment("a1", "expired.png", "image/png",
+                100, wireMock.baseUrl() + "/cdn/expired.png");
+        final Attachment result = client.downloadAttachment(att, Set.of("localhost"));
+
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void downloadAttachment_streamingAbortOnOversizedChunkedResponse() {
+        final byte[] oversized = new byte[1024 * 1024 + 1];
+        wireMock.stubFor(get(urlPathEqualTo("/cdn/chunked.bin"))
+                .willReturn(aResponse().withStatus(200).withBody(oversized)));
+
+        client.maxAttachmentBytes = 1024 * 1024;
+        final var att = new DiscordAttachment("a1", "chunked.bin", "application/octet-stream",
+                0, wireMock.baseUrl() + "/cdn/chunked.bin");
+        final Attachment result = client.downloadAttachment(att, Set.of("localhost"));
+
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void guildId_returnsConfiguredValue() {
+        assertThat(client.guildId()).isEqualTo(GUILD_ID);
+    }
+
+    // ── Embed sending ─────────────────────────────────────────────────────────
+
+    @Test
+    void sendMessage_withEmbed_includesEmbedsArray() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        final var embed = new DiscordEmbed("Title", "Desc", null, 16711680,
+                List.of(new DiscordEmbed.Field("f1", "v1", true)),
+                null, null, new DiscordEmbed.Footer("foot"), null);
+
+        final PostResult result = client.sendMessage(TOKEN, "ch1", "text", List.of(embed));
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.content", equalTo("text")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].title", equalTo("Title")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].description", equalTo("Desc")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].color", equalTo("16711680")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].fields[0].name", equalTo("f1")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].footer.text", equalTo("foot"))));
+    }
+
+    @Test
+    void sendMessage_embedOnly_omitsContentField() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        final var embed = new DiscordEmbed("Title", "Desc", null, null,
+                List.of(), null, null, null, null);
+
+        final PostResult result = client.sendMessage(TOKEN, "ch1", null, List.of(embed));
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.embeds[0].title", equalTo("Title"))));
+    }
+
+    @Test
+    void sendReply_withEmbed_includesEmbedAndReference() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg2\",\"channel_id\":\"ch1\"}")));
+
+        final var embed = new DiscordEmbed("T", "D", null, 65280,
+                List.of(), null, null, null, null);
+
+        final PostResult result = client.sendReply(TOKEN, "ch1", "reply",
+                "parent1", List.of(embed));
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.embeds[0].title", equalTo("T")))
+                .withRequestBody(matchingJsonPath("$.message_reference.message_id",
+                        equalTo("parent1"))));
+    }
+
+    @Test
+    void sendMessage_existingThreeArgDelegates_noEmbedsInBody() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        client.sendMessage(TOKEN, "ch1", "text");
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.content", equalTo("text"))));
+    }
+
+    @Test
+    void sendMessage_embedWithThumbnailAndImage() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        final var embed = new DiscordEmbed(null, null, null, null,
+                List.of(), "https://img/thumb.png", "https://img/big.png",
+                null, new DiscordEmbed.Author("Bot"));
+
+        client.sendMessage(TOKEN, "ch1", "text", List.of(embed));
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.embeds[0].thumbnail.url",
+                        equalTo("https://img/thumb.png")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].image.url",
+                        equalTo("https://img/big.png")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].author.name",
+                        equalTo("Bot"))));
     }
 }
