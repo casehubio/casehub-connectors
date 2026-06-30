@@ -44,7 +44,8 @@ class DiscordMcpToolTest {
         wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
                 .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
 
-        final String result = tool.sendDiscord("ch1", "Hello", null, null, null, null);
+        final String result = tool.sendDiscord("ch1", "Hello", null, null, null, null,
+                null, null, null, null, null, null);
 
         assertThat(result).isEqualTo("Posted to ch1 (id=msg1)");
     }
@@ -54,7 +55,8 @@ class DiscordMcpToolTest {
         wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
                 .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
 
-        tool.sendDiscord("ch1", "Hello", null, null, null, null);
+        tool.sendDiscord("ch1", "Hello", null, null, null, null,
+                null, null, null, null, null, null);
 
         assertThat(bridge.lastConnectorId).isEqualTo(DiscordDiscovery.ID);
         assertThat(bridge.lastDestination).isEqualTo("ch1");
@@ -65,7 +67,8 @@ class DiscordMcpToolTest {
     void sendDiscord_blankToken_returnsFailedNoBridgeCall() {
         final var blankTool = new DiscordMcpTool(client, bridge, "");
 
-        final String result = blankTool.sendDiscord("ch1", "Hello", null, null, null, null);
+        final String result = blankTool.sendDiscord("ch1", "Hello", null, null, null, null,
+                null, null, null, null, null, null);
 
         assertThat(result).isEqualTo("Failed: casehub.connectors.discord.token is not configured");
         assertThat(bridge.lastConnectorId).isNull();
@@ -76,7 +79,8 @@ class DiscordMcpToolTest {
         wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
                 .willReturn(okJson("{\"id\":\"msg2\",\"channel_id\":\"ch1\"}")));
 
-        tool.sendDiscord("ch1", "reply", "parent1", null, null, null);
+        tool.sendDiscord("ch1", "reply", "parent1", null, null, null,
+                null, null, null, null, null, null);
 
         wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
                 .withRequestBody(matchingJsonPath("$.message_reference.message_id",
@@ -88,7 +92,8 @@ class DiscordMcpToolTest {
         wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
                 .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
 
-        tool.sendDiscord("ch1", "text", null, "Embed Title", "Embed Desc", "16711680");
+        tool.sendDiscord("ch1", "text", null, "Embed Title", "Embed Desc", "16711680",
+                null, null, null, null, null, null);
 
         wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
                 .withRequestBody(matchingJsonPath("$.embeds[0].title", equalTo("Embed Title")))
@@ -100,7 +105,8 @@ class DiscordMcpToolTest {
         wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
                 .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
 
-        final String result = tool.sendDiscord("ch1", null, null, "Title", null, null);
+        final String result = tool.sendDiscord("ch1", null, null, "Title", null, null,
+                null, null, null, null, null, null);
 
         assertThat(result).startsWith("Posted to");
         assertThat(bridge.lastContent).isEqualTo("Title");
@@ -108,7 +114,8 @@ class DiscordMcpToolTest {
 
     @Test
     void sendDiscord_noTextNoEmbed_returnsFailed() {
-        final String result = tool.sendDiscord("ch1", null, null, null, null, null);
+        final String result = tool.sendDiscord("ch1", null, null, null, null, null,
+                null, null, null, null, null, null);
 
         assertThat(result).isEqualTo("Failed: text or embed required");
         assertThat(bridge.lastConnectorId).isNull();
@@ -119,10 +126,111 @@ class DiscordMcpToolTest {
         wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
                 .willReturn(aResponse().withStatus(403).withBody("Forbidden")));
 
-        final String result = tool.sendDiscord("ch1", "Hello", null, null, null, null);
+        final String result = tool.sendDiscord("ch1", "Hello", null, null, null, null,
+                null, null, null, null, null, null);
 
         assertThat(result).startsWith("Failed:");
         assertThat(bridge.lastConnectorId).isNull();
+    }
+
+    @Test
+    void sendDiscord_fullEmbed_allParams() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        final String result = tool.sendDiscord("ch1", null, null,
+                "Title", "Description", "255",
+                "https://example.com",
+                "https://example.com/thumb.png",
+                "https://example.com/image.png",
+                "Footer text", "Author Name",
+                "[{\"name\":\"Field 1\",\"value\":\"Value 1\",\"inline\":true}]");
+
+        assertThat(result).startsWith("Posted to");
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.embeds[0].url", equalTo("https://example.com")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].thumbnail.url", equalTo("https://example.com/thumb.png")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].image.url", equalTo("https://example.com/image.png")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].footer.text", equalTo("Footer text")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].author.name", equalTo("Author Name")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].fields[0].name", equalTo("Field 1")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].fields[0].inline", equalTo("true"))));
+    }
+
+    @Test
+    void sendDiscord_embedFieldsMalformedJson_returnsFailed() {
+        final String result = tool.sendDiscord("ch1", null, null,
+                "Title", null, null, null, null, null, null, null, "not-json");
+
+        assertThat(result).startsWith("Failed: embedFields must be");
+    }
+
+    @Test
+    void sendDiscord_embedFieldMissingName_returnsFailed() {
+        final String result = tool.sendDiscord("ch1", null, null,
+                "Title", null, null, null, null, null, null, null,
+                "[{\"value\":\"val\"}]");
+
+        assertThat(result).startsWith("Failed: embedFields");
+    }
+
+    @Test
+    void sendDiscord_embedTitleExceedsLimit_returnsFailed() {
+        final String result = tool.sendDiscord("ch1", null, null,
+                "x".repeat(257), null, null, null, null, null, null, null, null);
+
+        assertThat(result).isEqualTo("Failed: embedTitle exceeds 256 characters");
+    }
+
+    @Test
+    void sendDiscord_embedDescriptionExceedsLimit_returnsFailed() {
+        final String result = tool.sendDiscord("ch1", null, null,
+                "Title", "x".repeat(4097), null, null, null, null, null, null, null);
+
+        assertThat(result).isEqualTo("Failed: embedDescription exceeds 4096 characters");
+    }
+
+    @Test
+    void sendDiscord_embedFieldsExceeds25_returnsFailed() {
+        StringBuilder fields = new StringBuilder("[");
+        for (int i = 0; i < 26; i++) {
+            if (i > 0) fields.append(",");
+            fields.append("{\"name\":\"f").append(i).append("\",\"value\":\"v\"}");
+        }
+        fields.append("]");
+
+        final String result = tool.sendDiscord("ch1", null, null,
+                "Title", null, null, null, null, null, null, null, fields.toString());
+
+        assertThat(result).isEqualTo("Failed: embedFields exceeds 25 fields");
+    }
+
+    @Test
+    void sendDiscord_totalEmbedContentExceedsLimit_returnsFailed() {
+        final String result = tool.sendDiscord("ch1", null, null,
+                "Title", "x".repeat(4096), null, null, null, null,
+                "x".repeat(2000), null, null);
+
+        assertThat(result).startsWith("Failed: total embed content exceeds 6000 characters");
+    }
+
+    @Test
+    void sendDiscord_embedUrlWithoutTitle_returnsFailed() {
+        final String result = tool.sendDiscord("ch1", "text", null,
+                null, "Desc", null, "https://example.com", null, null, null, null, null);
+
+        assertThat(result).isEqualTo("Failed: embedUrl requires embedTitle");
+    }
+
+    @Test
+    void sendDiscord_onlyFooter_isValidEmbed() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        final String result = tool.sendDiscord("ch1", null, null,
+                null, null, null, null, null, null, "Just footer", null, null);
+
+        assertThat(result).startsWith("Posted to");
     }
 
     // ── list_discord_channels ─────────────────────────────────────────────────
