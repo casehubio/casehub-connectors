@@ -1,5 +1,7 @@
 package io.casehub.connectors.chat.discord;
 
+import java.util.List;
+
 import jakarta.enterprise.context.ApplicationScoped;
 
 import io.casehub.connectors.InboundConnectorTypes;
@@ -33,7 +35,7 @@ public class DiscordInboundTranslator implements InboundTranslator {
                 messageRef,
                 parentRef,
                 new MemberRef(msg.externalSenderId()),
-                new ChatContent(msg.content(), null, msg.attachments()),
+                new ChatContent(msg.content(), null, msg.attachments(), List.of()),
                 msg.receivedAt());
     }
 }

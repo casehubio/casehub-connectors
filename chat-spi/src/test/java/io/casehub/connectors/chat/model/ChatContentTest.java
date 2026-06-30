@@ -29,7 +29,7 @@ class ChatContentTest {
 
     @Test
     void nullAttachmentsBecomesEmptyList() {
-        ChatContent content = new ChatContent("hello", null, null);
+        ChatContent content = new ChatContent("hello", null, null, null);
         assertThat(content.attachments()).isEmpty();
     }
 
@@ -37,8 +37,23 @@ class ChatContentTest {
     void attachmentsAreDefensivelyCopied() {
         List<Attachment> mutable = new ArrayList<>();
         mutable.add(new Attachment("f.txt", "text/plain", new byte[]{1}));
-        ChatContent content = new ChatContent("hello", null, mutable);
+        ChatContent content = new ChatContent("hello", null, mutable, null);
         mutable.add(new Attachment("g.txt", "text/plain", new byte[]{2}));
         assertThat(content.attachments()).hasSize(1);
+    }
+
+    @Test
+    void cardsDefaultsToEmptyList() {
+        final var content = new ChatContent("hello");
+        assertThat(content.cards()).isEmpty();
+    }
+
+    @Test
+    void cardsDefensiveCopy() {
+        final var mutable = new java.util.ArrayList<>(List.of(
+                RichCard.builder().title("t").build()));
+        final var content = new ChatContent("hello", null, List.of(), mutable);
+        mutable.add(RichCard.builder().title("t2").build());
+        assertThat(content.cards()).hasSize(1);
     }
 }

@@ -1,5 +1,7 @@
 package io.casehub.connectors.chat.slack;
 
+import java.util.List;
+
 import jakarta.enterprise.context.ApplicationScoped;
 
 import io.casehub.connectors.InboundConnectorTypes;
@@ -32,7 +34,7 @@ public class SlackInboundTranslator implements InboundTranslator {
                 messageRef,
                 parentRef,
                 new MemberRef(msg.externalSenderId()),
-                new ChatContent(msg.content(), null, msg.attachments()),
+                new ChatContent(msg.content(), null, msg.attachments(), List.of()),
                 msg.receivedAt());
     }
 }

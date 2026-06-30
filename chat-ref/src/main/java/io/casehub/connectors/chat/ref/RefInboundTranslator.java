@@ -1,5 +1,7 @@
 package io.casehub.connectors.chat.ref;
 
+import java.util.List;
+
 import jakarta.enterprise.context.ApplicationScoped;
 
 import io.casehub.connectors.InboundMessage;
@@ -31,7 +33,7 @@ public class RefInboundTranslator implements InboundTranslator {
                 ? new ChatMessageRef(channel, parentId) : null;
         return new ReceivedMessage(CONNECTOR_TYPE, channel, messageRef, parentRef,
                 new MemberRef(msg.externalSenderId()),
-                new ChatContent(msg.content(), null, msg.attachments()),
+                new ChatContent(msg.content(), null, msg.attachments(), List.of()),
                 msg.receivedAt());
     }
 }

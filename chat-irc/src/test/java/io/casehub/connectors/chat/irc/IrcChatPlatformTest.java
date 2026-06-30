@@ -71,7 +71,7 @@ class IrcChatPlatformTest {
     void sendToChannelReturnsSuccess() {
         client.join("#test");
         ChatChannelRef channel = new ChatChannelRef("#test");
-        ChatContent content = new ChatContent("hello", null, List.of());
+        ChatContent content = new ChatContent("hello", null, List.of(), List.of());
 
         SendResult result = platform.messaging().send(channel, content);
 
@@ -84,7 +84,7 @@ class IrcChatPlatformTest {
     void sendWhenDisconnectedReturnsFailure() {
         client.disconnect();
         ChatChannelRef channel = new ChatChannelRef("#test");
-        ChatContent content = new ChatContent("hello", null, List.of());
+        ChatContent content = new ChatContent("hello", null, List.of(), List.of());
 
         SendResult result = platform.messaging().send(channel, content);
 
@@ -121,7 +121,7 @@ class IrcChatPlatformTest {
         client.join("#thread-test");
         ChatChannelRef channel = new ChatChannelRef("#thread-test");
         ChatMessageRef messageRef = new ChatMessageRef(channel, "msg-123");
-        ChatContent content = new ChatContent("reply text", null, List.of());
+        ChatContent content = new ChatContent("reply text", null, List.of(), List.of());
 
         SendResult result = platform.threading().reply(messageRef, content);
 

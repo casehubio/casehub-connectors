@@ -79,7 +79,7 @@ class SlackChatPlatformTest {
                                 """)));
 
         ChatChannelRef channel = new ChatChannelRef("C123");
-        ChatContent content = new ChatContent("Hello Slack", null, List.of());
+        ChatContent content = new ChatContent("Hello Slack", null, List.of(), List.of());
 
         SendResult result = platform.messaging().send(channel, content);
 
@@ -105,7 +105,7 @@ class SlackChatPlatformTest {
 
         ChatChannelRef channel = new ChatChannelRef("C123");
         ChatMessageRef parent = new ChatMessageRef(channel, "1234567890.123456");
-        ChatContent content = new ChatContent("Reply text", null, List.of());
+        ChatContent content = new ChatContent("Reply text", null, List.of(), List.of());
 
         SendResult result = platform.threading().reply(parent, content);
 
@@ -410,7 +410,7 @@ class SlackChatPlatformTest {
         blankPlatform.init();
 
         ChatChannelRef channel = new ChatChannelRef("C123");
-        ChatContent content = new ChatContent("Hello", null, List.of());
+        ChatContent content = new ChatContent("Hello", null, List.of(), List.of());
 
         SendResult result = blankPlatform.messaging().send(channel, content);
 

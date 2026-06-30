@@ -1,5 +1,6 @@
 package io.casehub.connectors.chat.irc;
 
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -32,7 +33,7 @@ public class IrcInboundTranslator implements InboundTranslator {
                 messageRef,
                 null,
                 new MemberRef(msg.externalSenderId()),
-                new ChatContent(msg.content(), null, msg.attachments()),
+                new ChatContent(msg.content(), null, msg.attachments(), List.of()),
                 msg.receivedAt());
     }
 }

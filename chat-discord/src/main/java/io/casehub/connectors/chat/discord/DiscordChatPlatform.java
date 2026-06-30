@@ -338,7 +338,7 @@ public class DiscordChatPlatform implements ChatPlatform {
                 messageRef,
                 parentRef,
                 new MemberRef(dm.author().id()),
-                new ChatContent(dm.content(), null, attachments),
+                new ChatContent(dm.content(), null, attachments, List.of()),
                 dm.timestamp());
     }
 

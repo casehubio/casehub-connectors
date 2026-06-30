@@ -115,7 +115,7 @@ class DiscordChatPlatformTest {
                                 """)));
 
         ChatChannelRef channel = new ChatChannelRef("chan-123");
-        ChatContent content = new ChatContent("Hello Discord", null, List.of());
+        ChatContent content = new ChatContent("Hello Discord", null, List.of(), List.of());
 
         SendResult result = platform.messaging().send(channel, content);
 
@@ -129,7 +129,7 @@ class DiscordChatPlatformTest {
     void messaging_contentExceeds2000CharsReturnsFailure() {
         ChatChannelRef channel = new ChatChannelRef("chan-123");
         String longContent = "x".repeat(2001);
-        ChatContent content = new ChatContent(longContent, null, List.of());
+        ChatContent content = new ChatContent(longContent, null, List.of(), List.of());
 
         SendResult result = platform.messaging().send(channel, content);
 
@@ -148,7 +148,7 @@ class DiscordChatPlatformTest {
                                 """)));
 
         ChatChannelRef channel = new ChatChannelRef("chan-123");
-        ChatContent content = new ChatContent("plain text", "**bold markdown**", List.of());
+        ChatContent content = new ChatContent("plain text", "**bold markdown**", List.of(), List.of());
 
         platform.messaging().send(channel, content);
 
@@ -168,7 +168,7 @@ class DiscordChatPlatformTest {
 
         ChatChannelRef channel = new ChatChannelRef("chan-123");
         ChatMessageRef parent = new ChatMessageRef(channel, "msg-456");
-        ChatContent content = new ChatContent("Reply text", null, List.of());
+        ChatContent content = new ChatContent("Reply text", null, List.of(), List.of());
 
         SendResult result = platform.threading().reply(parent, content);
 
@@ -461,7 +461,7 @@ class DiscordChatPlatformTest {
         blankPlatform.init();
 
         ChatChannelRef channel = new ChatChannelRef("chan-123");
-        ChatContent content = new ChatContent("Hello", null, List.of());
+        ChatContent content = new ChatContent("Hello", null, List.of(), List.of());
 
         SendResult result = blankPlatform.messaging().send(channel, content);
 
