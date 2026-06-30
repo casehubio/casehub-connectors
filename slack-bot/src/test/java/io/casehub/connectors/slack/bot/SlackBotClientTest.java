@@ -422,4 +422,224 @@ class SlackBotClientTest {
         try { action.run(); } finally { logger.removeHandler(handler); }
         return records;
     }
+
+    // ── listConversations ─────────────────────────────────────────────────────
+
+    @Test
+    void listConversations_returnsFullDetail() {
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.list.*"))
+                .willReturn(okJson("""
+                        {"ok":true,"channels":[
+                          {"id":"C1","name":"general","topic":{"value":"Main"},"purpose":{"value":"General discussion"},"is_private":false},
+                          {"id":"C2","name":"secret","topic":{"value":""},"purpose":{"value":"Private stuff"},"is_private":true}
+                        ],"response_metadata":{"next_cursor":""}}
+                        """)));
+
+        List<SlackBotClient.ConversationInfo> convos = client.listConversations("tok");
+
+        assertThat(convos).hasSize(2);
+        assertThat(convos.get(0).id()).isEqualTo("C1");
+        assertThat(convos.get(0).name()).isEqualTo("general");
+        assertThat(convos.get(0).topic()).isEqualTo("Main");
+        assertThat(convos.get(0).purpose()).isEqualTo("General discussion");
+        assertThat(convos.get(0).isPrivate()).isFalse();
+        assertThat(convos.get(1).isPrivate()).isTrue();
+    }
+
+    @Test
+    void listChannels_delegatesToListConversations() {
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.list.*"))
+                .willReturn(okJson("""
+                        {"ok":true,"channels":[
+                          {"id":"C1","name":"general","topic":{"value":""},"purpose":{"value":""},"is_private":false}
+                        ],"response_metadata":{"next_cursor":""}}
+                        """)));
+
+        List<DiscoveredTarget> targets = client.listChannels("tok");
+
+        assertThat(targets).hasSize(1);
+        assertThat(targets.get(0).id()).isEqualTo("C1");
+        assertThat(targets.get(0).displayName()).isEqualTo("#general");
+    }
+
+    // ── Reaction methods ──────────────────────────────────────────────────────
+
+    @Test
+    void addReaction_success() {
+        wireMock.stubFor(post(urlEqualTo("/api/reactions.add"))
+                .willReturn(okJson("{\"ok\":true}")));
+
+        SlackBotClient.ReactionResult result = client.addReaction("tok", "C1", "1234567890.123456", "thumbsup");
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/reactions.add"))
+                .withRequestBody(matchingJsonPath("$.channel", equalTo("C1")))
+                .withRequestBody(matchingJsonPath("$.timestamp", equalTo("1234567890.123456")))
+                .withRequestBody(matchingJsonPath("$.name", equalTo("thumbsup"))));
+    }
+
+    @Test
+    void removeReaction_success() {
+        wireMock.stubFor(post(urlEqualTo("/api/reactions.remove"))
+                .willReturn(okJson("{\"ok\":true}")));
+
+        SlackBotClient.ReactionResult result = client.removeReaction("tok", "C1", "1234567890.123456", "thumbsup");
+
+        assertThat(result.ok()).isTrue();
+    }
+
+    @Test
+    void getReactions_success() {
+        wireMock.stubFor(get(urlMatching("/api/reactions\\.get.*"))
+                .willReturn(okJson("""
+                        {"ok":true,"message":{"reactions":[
+                          {"name":"thumbsup","count":3},
+                          {"name":"heart","count":1}
+                        ]}}
+                        """)));
+
+        SlackBotClient.ReactionListResult result = client.getReactions("tok", "C1", "1234567890.123456");
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.emojis()).containsExactly("thumbsup", "heart");
+    }
+
+    @Test
+    void addReaction_apiError() {
+        wireMock.stubFor(post(urlEqualTo("/api/reactions.add"))
+                .willReturn(okJson("{\"ok\":false,\"error\":\"already_reacted\"}")));
+
+        SlackBotClient.ReactionResult result = client.addReaction("tok", "C1", "ts", "thumbsup");
+
+        assertThat(result.ok()).isFalse();
+        assertThat(result.error()).isEqualTo("already_reacted");
+    }
+
+    // ── Presence, members, users ──────────────────────────────────────────────
+
+    @Test
+    void getPresence_active() {
+        wireMock.stubFor(get(urlMatching("/api/users\\.getPresence.*"))
+                .willReturn(okJson("{\"ok\":true,\"presence\":\"active\"}")));
+
+        SlackBotClient.PresenceResult result = client.getPresence("tok", "U123");
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.presence()).isEqualTo("active");
+    }
+
+    @Test
+    void listConversationMembers_paginates() {
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.members\\?channel=C1&limit=200$"))
+                .willReturn(okJson("""
+                        {"ok":true,"members":["U1","U2"],"response_metadata":{"next_cursor":"page2"}}
+                        """)));
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.members\\?channel=C1&limit=200&cursor=page2"))
+                .willReturn(okJson("""
+                        {"ok":true,"members":["U3"],"response_metadata":{"next_cursor":""}}
+                        """)));
+
+        List<String> members = client.listConversationMembers("tok", "C1");
+
+        assertThat(members).containsExactly("U1", "U2", "U3");
+    }
+
+    @Test
+    void listUsers_returnsDisplayNames() {
+        wireMock.stubFor(get(urlMatching("/api/users\\.list.*"))
+                .willReturn(okJson("""
+                        {"ok":true,"members":[
+                          {"id":"U1","profile":{"display_name":"Alice","real_name":"Alice Smith"}},
+                          {"id":"U2","profile":{"display_name":"","real_name":"Bob Jones"}}
+                        ],"response_metadata":{"next_cursor":""}}
+                        """)));
+
+        List<SlackBotClient.UserInfo> users = client.listUsers("tok");
+
+        assertThat(users).hasSize(2);
+        assertThat(users.get(0).displayName()).isEqualTo("Alice");
+        assertThat(users.get(1).displayName()).isEmpty();
+        assertThat(users.get(1).realName()).isEqualTo("Bob Jones");
+    }
+
+    // ── Channel management + member management ───────────────────────────────
+
+    @Test
+    void createConversation_success() {
+        wireMock.stubFor(post(urlEqualTo("/api/conversations.create"))
+                .willReturn(okJson("""
+                        {"ok":true,"channel":{"id":"C99","name":"new-chan","topic":{"value":""},"purpose":{"value":""},"is_private":false}}
+                        """)));
+
+        SlackBotClient.ConversationResult result = client.createConversation("tok", "new-chan", false);
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.info().id()).isEqualTo("C99");
+        assertThat(result.info().name()).isEqualTo("new-chan");
+    }
+
+    @Test
+    void getConversationInfo_success() {
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.info.*"))
+                .willReturn(okJson("""
+                        {"ok":true,"channel":{"id":"C1","name":"general","topic":{"value":"Main topic"},"purpose":{"value":"General chat"},"is_private":false}}
+                        """)));
+
+        SlackBotClient.ConversationResult result = client.getConversationInfo("tok", "C1");
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.info().topic()).isEqualTo("Main topic");
+    }
+
+    @Test
+    void inviteToConversation_success() {
+        wireMock.stubFor(post(urlEqualTo("/api/conversations.invite"))
+                .willReturn(okJson("{\"ok\":true}")));
+
+        SlackBotClient.ReactionResult result = client.inviteToConversation("tok", "C1", "U1");
+
+        assertThat(result.ok()).isTrue();
+    }
+
+    @Test
+    void kickFromConversation_success() {
+        wireMock.stubFor(post(urlEqualTo("/api/conversations.kick"))
+                .willReturn(okJson("{\"ok\":true}")));
+
+        SlackBotClient.ReactionResult result = client.kickFromConversation("tok", "C1", "U1");
+
+        assertThat(result.ok()).isTrue();
+    }
+
+    // ── Message history ───────────────────────────────────────────────────────
+
+    @Test
+    void getHistory_success() {
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.history.*"))
+                .willReturn(okJson("""
+                        {"ok":true,"messages":[
+                          {"ts":"1234567890.123456","user":"U1","text":"Hello","thread_ts":null},
+                          {"ts":"1234567891.654321","user":"U2","text":"Reply","thread_ts":"1234567890.123456"}
+                        ]}
+                        """)));
+
+        SlackBotClient.HistoryResult result = client.getHistory("tok", "C1", "1234567889.000000", 100);
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.messages()).hasSize(2);
+        assertThat(result.messages().get(0).ts()).isEqualTo("1234567890.123456");
+        assertThat(result.messages().get(0).text()).isEqualTo("Hello");
+        assertThat(result.messages().get(1).threadTs()).isEqualTo("1234567890.123456");
+    }
+
+    @Test
+    void getHistory_apiError() {
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.history.*"))
+                .willReturn(okJson("{\"ok\":false,\"error\":\"channel_not_found\"}")));
+
+        SlackBotClient.HistoryResult result = client.getHistory("tok", "C1", "0", 100);
+
+        assertThat(result.ok()).isFalse();
+        assertThat(result.error()).isEqualTo("channel_not_found");
+    }
 }
