@@ -5,6 +5,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
+import static com.github.tomakehurst.wiremock.client.WireMock.not;
 import static com.github.tomakehurst.wiremock.client.WireMock.notMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -641,5 +642,46 @@ class SlackBotClientTest {
 
         assertThat(result.ok()).isFalse();
         assertThat(result.error()).isEqualTo("channel_not_found");
+    }
+
+    // ── Block Kit support ─────────────────────────────────────────────────────
+
+    @Test
+    void postMessageWithBlocks() {
+        wireMock.stubFor(post(urlEqualTo("/api/chat.postMessage"))
+                .willReturn(okJson("{\"ok\":true,\"ts\":\"1234567890.123456\"}")));
+
+        final String blocksJson = "[{\"type\":\"header\",\"text\":{\"type\":\"plain_text\",\"text\":\"Title\"}}]";
+        final var result = client.postMessage("xoxb-test", "C123", "fallback", null, blocksJson);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/chat.postMessage"))
+                .withRequestBody(matchingJsonPath("$.blocks")));
+    }
+
+    @Test
+    void postMessageWithoutBlocksDelegates() {
+        wireMock.stubFor(post(urlEqualTo("/api/chat.postMessage"))
+                .willReturn(okJson("{\"ok\":true,\"ts\":\"1234567890.123456\"}")));
+
+        final var result = client.postMessage("xoxb-test", "C123", "hello", null);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/chat.postMessage"))
+                .withRequestBody(not(matchingJsonPath("$.blocks"))));
+    }
+
+    @Test
+    void listConversationsParsesMemberCount() {
+        wireMock.stubFor(get(urlMatching("/api/conversations\\.list.*"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":[{\"id\":\"C1\",\"name\":\"general\","
+                        + "\"topic\":{\"value\":\"t\"},\"purpose\":{\"value\":\"p\"},"
+                        + "\"is_private\":false,\"num_members\":42}],"
+                        + "\"response_metadata\":{\"next_cursor\":\"\"}}")));
+
+        final var result = client.listConversations("xoxb-test");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().numMembers()).isEqualTo(42);
     }
 }

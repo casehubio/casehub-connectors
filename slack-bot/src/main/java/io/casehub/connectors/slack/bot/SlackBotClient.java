@@ -66,7 +66,23 @@ public class SlackBotClient {
      */
     public PostResult postMessage(final String token, final String channelId,
                                   final String text, final String threadTs) {
-        final String json = buildPayload(channelId, text, threadTs);
+        return postMessage(token, channelId, text, threadTs, null);
+    }
+
+    /**
+     * Posts a message to a Slack channel with optional Block Kit blocks.
+     *
+     * @param token      bot token ({@code xoxb-…})
+     * @param channelId  Slack channel ID (e.g. {@code C123ABC})
+     * @param text       message text (fallback text when blocks are provided)
+     * @param threadTs   thread root {@code ts} for replies, or {@code null} for new top-level messages
+     * @param blocksJson Block Kit blocks as JSON array string, or {@code null}
+     * @return the result of the API call
+     */
+    public PostResult postMessage(final String token, final String channelId,
+                                  final String text, final String threadTs,
+                                  final String blocksJson) {
+        final String json = buildPayload(channelId, text, threadTs, blocksJson);
         final HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(apiBaseUrl + API_PATH))
                 .header("Authorization", "Bearer " + token)
@@ -651,7 +667,9 @@ public class SlackBotClient {
                     ? ch.getJsonObject("purpose").getString("value", "")
                     : "";
             final boolean isPrivate = ch.getBoolean("is_private", false);
-            return new ConversationResult(true, new ConversationInfo(id, name, topic, purpose, isPrivate), null);
+            final Integer numMembers = ch.containsKey("num_members")
+                    ? ch.getInt("num_members") : null;
+            return new ConversationResult(true, new ConversationInfo(id, name, topic, purpose, isPrivate, numMembers), null);
         } catch (final Exception e) {
             LOG.warning("SlackBotClient: failed to parse conversation result — " + e.getMessage());
             return new ConversationResult(false, null, "parse-error");
@@ -710,7 +728,9 @@ public class SlackBotClient {
                                 ? ch.getJsonObject("purpose").getString("value", "")
                                 : "";
                         final boolean isPrivate = ch.getBoolean("is_private", false);
-                        return new ConversationInfo(id, name, topic, purpose, isPrivate);
+                        final Integer numMembers = ch.containsKey("num_members")
+                                ? ch.getInt("num_members") : null;
+                        return new ConversationInfo(id, name, topic, purpose, isPrivate, numMembers);
                     })
                     .toList();
             return new ConversationPageResult(true, conversations, nextCursor, "");
@@ -787,12 +807,15 @@ public class SlackBotClient {
     }
 
     private static String buildPayload(final String channelId, final String text,
-                                       final String threadTs) {
+                                       final String threadTs, final String blocksJson) {
         final JsonObjectBuilder builder = Json.createObjectBuilder()
                 .add("channel", channelId)
                 .add("text", text);
         if (threadTs != null) {
             builder.add("thread_ts", threadTs);
+        }
+        if (blocksJson != null) {
+            builder.add("blocks", Json.createReader(new StringReader(blocksJson)).readArray());
         }
         return builder.build().toString();
     }
@@ -813,7 +836,7 @@ public class SlackBotClient {
     private record UsersPageResult(boolean ok, List<UserInfo> users, String nextCursor, String error) {}
 
     public record PostResult(boolean ok, String ts, String error) {}
-    public record ConversationInfo(String id, String name, String topic, String purpose, boolean isPrivate) {}
+    public record ConversationInfo(String id, String name, String topic, String purpose, boolean isPrivate, Integer numMembers) {}
     public record ConversationResult(boolean ok, ConversationInfo info, String error) {}
     public record ReactionResult(boolean ok, String error) {}
     public record ReactionListResult(boolean ok, List<String> emojis, String error) {}
