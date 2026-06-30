@@ -674,7 +674,8 @@ public class SlackBotClient {
                         final String ts = m.getString("ts", "");
                         final String user = m.getString("user", "");
                         final String text = m.getString("text", "");
-                        final String threadTs = m.isNull("thread_ts") ? null : m.getString("thread_ts", null);
+                        final String threadTs = m.containsKey("thread_ts") && !m.isNull("thread_ts")
+                                ? m.getString("thread_ts") : null;
                         return new HistoryMessage(ts, user, text, threadTs);
                     })
                     .toList();
