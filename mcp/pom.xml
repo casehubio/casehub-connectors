@@ -31,13 +31,24 @@ classpath (casehubio/qhorus#249).</description>
     </dependency>
     <dependency>
       <groupId>io.casehub</groupId>
-      <artifactId>casehub-connectors-slack-bot</artifactId>
+      <artifactId>casehub-connectors-chat-slack</artifactId>
       <version>0.2-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>io.casehub</groupId>
-      <artifactId>casehub-connectors-discord</artifactId>
+      <artifactId>casehub-connectors-chat-discord</artifactId>
       <version>0.2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-connectors-chat-spi</artifactId>
+      <version>0.2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-connectors-chat-ref</artifactId>
+      <version>0.2-SNAPSHOT</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.quarkiverse.mcp</groupId>

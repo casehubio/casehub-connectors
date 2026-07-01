@@ -46,7 +46,7 @@ public class SlackBotClient {
     private static final Logger LOG = Logger.getLogger(SlackBotClient.class.getName());
     private static final String API_PATH = "/api/chat.postMessage";
     private static final String LIST_PATH = "/api/conversations.list";
-    private static final String LIST_BASE_QUERY = "?types=public_channel,private_channel&limit=200";
+    private static final String LIST_BASE_QUERY = "?types=public_channel,private_channel&limit=200&include_num_members=true";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final int MAX_PAGES = 50;
 

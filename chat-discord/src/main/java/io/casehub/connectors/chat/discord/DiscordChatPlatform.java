@@ -375,24 +375,31 @@ public class DiscordChatPlatform implements ChatPlatform {
                 fields, card.thumbnailUrl(), card.imageUrl(), footer, author);
     }
 
+    /** Returns {@code null} if valid, or {@link SendResult#failure} with the reason. */
     private SendResult validateEmbeds(final List<RichCard> cards) {
         if (cards.size() > 10) {
             return SendResult.failure("Discord allows at most 10 embeds per message");
         }
         long totalChars = 0;
         for (final RichCard card : cards) {
-            if (card.title() != null && card.title().length() > 256)
+            if (card.title() != null && card.title().length() > 256) {
                 return SendResult.failure("Embed title exceeds 256 characters");
-            if (card.description() != null && card.description().length() > 4096)
+            }
+            if (card.description() != null && card.description().length() > 4096) {
                 return SendResult.failure("Embed description exceeds 4096 characters");
-            if (card.footer() != null && card.footer().length() > 2048)
+            }
+            if (card.footer() != null && card.footer().length() > 2048) {
                 return SendResult.failure("Embed footer exceeds 2048 characters");
-            if (card.author() != null && card.author().length() > 256)
+            }
+            if (card.author() != null && card.author().length() > 256) {
                 return SendResult.failure("Embed author exceeds 256 characters");
-            if (card.fields().size() > 25)
+            }
+            if (card.fields().size() > 25) {
                 return SendResult.failure("Embed exceeds 25 fields");
-            if (card.url() != null && card.title() == null)
+            }
+            if (card.url() != null && card.title() == null) {
                 return SendResult.failure("Embed url requires title");
+            }
             totalChars += (card.title() != null ? card.title().length() : 0)
                     + (card.description() != null ? card.description().length() : 0)
                     + (card.footer() != null ? card.footer().length() : 0)
