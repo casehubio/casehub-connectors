@@ -74,4 +74,64 @@ class SlackInboundTranslatorTest {
         assertThat(received.content().attachments()).hasSize(1);
         assertThat(received.content().attachments().get(0).filename()).isEqualTo("doc.pdf");
     }
+
+    @Test
+    void translate_blocksParsedAsRichCards() {
+        final String blocks = """
+                [{"type":"header","text":{"type":"plain_text","text":"Deploy Report"}},\
+                {"type":"section","text":{"type":"mrkdwn","text":"All services healthy"}}]""";
+        InboundMessage inbound = new InboundMessage(
+                "slack-inbound", "slack", "U123", "C456",
+                "Deploy Report", List.of(), Instant.now(),
+                Map.of("slack-ts", "ts1", "slack-blocks", blocks), null);
+
+        ReceivedMessage received = translator.translate(inbound);
+
+        assertThat(received.content().cards()).hasSize(2);
+        assertThat(received.content().cards().get(0).title()).isEqualTo("Deploy Report");
+        assertThat(received.content().cards().get(1).description()).isEqualTo("All services healthy");
+    }
+
+    @Test
+    void translate_noBlocks_emptyCards() {
+        InboundMessage inbound = new InboundMessage(
+                "slack-inbound", "slack", "U123", "C456",
+                "plain", List.of(), Instant.now(),
+                Map.of("slack-ts", "ts1"), null);
+
+        ReceivedMessage received = translator.translate(inbound);
+
+        assertThat(received.content().cards()).isEmpty();
+    }
+
+    @Test
+    void parseBlocks_sectionWithFields() {
+        final String json = """
+                [{"type":"section","text":{"type":"mrkdwn","text":"Status"},\
+                "fields":[{"type":"mrkdwn","text":"*Env:* prod"},{"type":"mrkdwn","text":"*Region:* us-east"}]}]""";
+        var cards = SlackInboundTranslator.parseBlocks(json);
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().description()).isEqualTo("Status");
+        assertThat(cards.getFirst().fields()).hasSize(2);
+        assertThat(cards.getFirst().fields().get(0).value()).isEqualTo("*Env:* prod");
+    }
+
+    @Test
+    void parseBlocks_skipsDividers() {
+        final String json = """
+                [{"type":"divider"},{"type":"section","text":{"type":"mrkdwn","text":"Content"}}]""";
+        var cards = SlackInboundTranslator.parseBlocks(json);
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().description()).isEqualTo("Content");
+    }
+
+    @Test
+    void parseBlocks_invalidJson_returnsEmpty() {
+        assertThat(SlackInboundTranslator.parseBlocks("not-json")).isEmpty();
+    }
+
+    @Test
+    void parseBlocks_null_returnsEmpty() {
+        assertThat(SlackInboundTranslator.parseBlocks(null)).isEmpty();
+    }
 }

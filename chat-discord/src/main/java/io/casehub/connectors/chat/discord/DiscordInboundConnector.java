@@ -195,6 +195,11 @@ public class DiscordInboundConnector implements InboundConnector {
             metadata.put("discord-attachment-download-failures", String.valueOf(downloadFailures));
         }
 
+        if (data.has("embeds") && data.get("embeds").isArray()
+                && !data.get("embeds").isEmpty()) {
+            metadata.put("discord-embeds", data.get("embeds").toString());
+        }
+
         final InboundMessage msg = new InboundMessage(
                 InboundConnectorIds.DISCORD_INBOUND,
                 InboundConnectorTypes.DISCORD,

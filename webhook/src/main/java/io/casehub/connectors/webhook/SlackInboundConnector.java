@@ -165,6 +165,9 @@ public class SlackInboundConnector extends WebhookInboundConnector {
             if (teamId   != null) meta.put("workspace-id",   teamId);
             if (slackTs  != null) meta.put("slack-ts",       slackTs);
             if (threadTs != null) meta.put("slack-thread-ts", threadTs);
+            if (event.containsKey("blocks")) {
+                meta.put("slack-blocks", event.getJsonArray("blocks").toString());
+            }
 
             messages.add(new InboundMessage(ID, InboundConnectorTypes.SLACK,
                     user, channel, text, List.of(), Instant.now(), meta, tenancyId));
