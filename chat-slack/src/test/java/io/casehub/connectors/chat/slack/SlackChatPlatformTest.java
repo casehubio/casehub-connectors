@@ -437,4 +437,56 @@ class SlackChatPlatformTest {
         // Discovery should return empty
         assertThat(blankPlatform.discovery().listChannels()).isEmpty();
     }
+
+    @Test
+    void sendMessageWithRichCard() {
+        wireMock.stubFor(post(urlEqualTo("/api/chat.postMessage"))
+                .willReturn(okJson("{\"ok\":true,\"ts\":\"1234567890.123456\"}")));
+
+        final var card = RichCard.builder()
+                .title("Deploy Summary")
+                .description("3 services updated")
+                .fields(List.of(new RichCard.Field("env", "prod", true)))
+                .footer("bot v2")
+                .author("CI")
+                .build();
+
+        final var content = new ChatContent("fallback", null, List.of(), List.of(card));
+        final var result = platform.messaging().send(new ChatChannelRef("C123"), content);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/chat.postMessage"))
+                .withRequestBody(matchingJsonPath("$.text", equalTo("fallback")))
+                .withRequestBody(matchingJsonPath("$.blocks[0].type", equalTo("header")))
+                .withRequestBody(matchingJsonPath("$.blocks[0].text.text", equalTo("Deploy Summary")))
+                .withRequestBody(matchingJsonPath("$.blocks[1].type", equalTo("section")))
+                .withRequestBody(matchingJsonPath("$.blocks[1].text.text", equalTo("3 services updated"))));
+    }
+
+    @Test
+    void sendMessageWithoutCardsNoBlocks() {
+        wireMock.stubFor(post(urlEqualTo("/api/chat.postMessage"))
+                .willReturn(okJson("{\"ok\":true,\"ts\":\"1234567890.123456\"}")));
+
+        final var content = new ChatContent("just text");
+        final var result = platform.messaging().send(new ChatChannelRef("C123"), content);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/chat.postMessage"))
+                .withRequestBody(not(matchingJsonPath("$.blocks"))));
+    }
+
+    @Test
+    void listChannelsIncludesMemberCount() {
+        wireMock.stubFor(get(urlPathEqualTo("/api/conversations.list"))
+                .willReturn(okJson("{\"ok\":true,\"channels\":[{\"id\":\"C1\",\"name\":\"general\","
+                        + "\"topic\":{\"value\":\"t\"},\"purpose\":{\"value\":\"p\"},"
+                        + "\"is_private\":false,\"num_members\":42}],"
+                        + "\"response_metadata\":{\"next_cursor\":\"\"}}")));
+
+        final var channels = platform.discovery().listChannels();
+
+        assertThat(channels).hasSize(1);
+        assertThat(channels.getFirst().memberCount()).isEqualTo(42);
+    }
 }

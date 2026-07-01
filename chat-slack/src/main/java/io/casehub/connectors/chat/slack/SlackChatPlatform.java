@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.json.Json;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -159,7 +160,9 @@ public class SlackChatPlatform implements ChatPlatform {
     // ── Messaging ───────────────────────────────────────────────────────────────
 
     private SendResult sendMessage(final ChatChannelRef channel, final ChatContent content) {
-        final PostResult result = client.postMessage(token, channel.id(), content.text(), null);
+        final String blocksJson = content.cards().isEmpty() ? null : serializeToBlocks(content.cards());
+        final PostResult result = client.postMessage(
+                token, channel.id(), content.text(), null, blocksJson);
         if (!result.ok()) {
             return SendResult.failure(result.error());
         }
@@ -171,8 +174,9 @@ public class SlackChatPlatform implements ChatPlatform {
     // ── Threading ───────────────────────────────────────────────────────────────
 
     private SendResult sendReply(final ChatMessageRef parent, final ChatContent content) {
+        final String blocksJson = content.cards().isEmpty() ? null : serializeToBlocks(content.cards());
         final PostResult result = client.postMessage(
-                token, parent.channel().id(), content.text(), parent.messageId());
+                token, parent.channel().id(), content.text(), parent.messageId(), blocksJson);
         if (!result.ok()) {
             return SendResult.failure(result.error());
         }
@@ -195,7 +199,8 @@ public class SlackChatPlatform implements ChatPlatform {
                 c.name(),
                 c.topic(),
                 c.purpose(),
-                c.isPrivate());
+                c.isPrivate(),
+                c.numMembers());
     }
 
     // ── Reactions ───────────────────────────────────────────────────────────────
@@ -336,6 +341,99 @@ public class SlackChatPlatform implements ChatPlatform {
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Serializes a list of {@link RichCard}s to Slack Block Kit JSON.
+     *
+     * <p>Multiple cards are separated by divider blocks. Each card is rendered as:
+     * <ul>
+     *   <li>Header block for {@code title}</li>
+     *   <li>Section block for {@code description} (with {@code url} as mrkdwn link if present,
+     *       {@code thumbnailUrl} as accessory image if present)</li>
+     *   <li>Section block with fields array for {@code fields}</li>
+     *   <li>Image block for {@code imageUrl}</li>
+     *   <li>Context block with mrkdwn elements for {@code author} and {@code footer}</li>
+     * </ul>
+     *
+     * <p>{@code color} is dropped silently — Block Kit has no color support.
+     *
+     * @param cards list of rich cards to serialize
+     * @return Block Kit JSON array as string
+     */
+    private String serializeToBlocks(final List<RichCard> cards) {
+        final var arrayBuilder = Json.createArrayBuilder();
+        boolean first = true;
+        for (final RichCard card : cards) {
+            if (!first) {
+                arrayBuilder.add(Json.createObjectBuilder().add("type", "divider"));
+            }
+            first = false;
+
+            if (card.title() != null) {
+                arrayBuilder.add(Json.createObjectBuilder()
+                        .add("type", "header")
+                        .add("text", Json.createObjectBuilder()
+                                .add("type", "plain_text")
+                                .add("text", card.title())));
+            }
+
+            if (card.description() != null) {
+                final String descText = card.url() != null
+                        ? "<" + card.url() + ">\n" + card.description()
+                        : card.description();
+                final var sectionBuilder = Json.createObjectBuilder()
+                        .add("type", "section")
+                        .add("text", Json.createObjectBuilder()
+                                .add("type", "mrkdwn")
+                                .add("text", descText));
+                if (card.thumbnailUrl() != null) {
+                    sectionBuilder.add("accessory", Json.createObjectBuilder()
+                            .add("type", "image")
+                            .add("image_url", card.thumbnailUrl())
+                            .add("alt_text", "thumbnail"));
+                }
+                arrayBuilder.add(sectionBuilder);
+            }
+
+            if (!card.fields().isEmpty()) {
+                final var fieldsArray = Json.createArrayBuilder();
+                for (final RichCard.Field f : card.fields()) {
+                    fieldsArray.add(Json.createObjectBuilder()
+                            .add("type", "mrkdwn")
+                            .add("text", "*" + f.name() + "*\n" + f.value()));
+                }
+                arrayBuilder.add(Json.createObjectBuilder()
+                        .add("type", "section")
+                        .add("fields", fieldsArray));
+            }
+
+            if (card.imageUrl() != null) {
+                arrayBuilder.add(Json.createObjectBuilder()
+                        .add("type", "image")
+                        .add("image_url", card.imageUrl())
+                        .add("alt_text", "image"));
+            }
+
+            if ((card.footer() != null && !card.footer().isBlank()) ||
+                    (card.author() != null && !card.author().isBlank())) {
+                final var elements = Json.createArrayBuilder();
+                if (card.author() != null && !card.author().isBlank()) {
+                    elements.add(Json.createObjectBuilder()
+                            .add("type", "mrkdwn")
+                            .add("text", card.author()));
+                }
+                if (card.footer() != null && !card.footer().isBlank()) {
+                    elements.add(Json.createObjectBuilder()
+                            .add("type", "mrkdwn")
+                            .add("text", card.footer()));
+                }
+                arrayBuilder.add(Json.createObjectBuilder()
+                        .add("type", "context")
+                        .add("elements", elements));
+            }
+        }
+        return arrayBuilder.build().toString();
+    }
 
     /**
      * Parses a Slack {@code ts} string (e.g. {@code "1234567890.123456"}) into an {@link Instant}.
