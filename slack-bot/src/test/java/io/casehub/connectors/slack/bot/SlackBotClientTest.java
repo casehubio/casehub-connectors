@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 
 import io.casehub.connectors.DiscoveredTarget;
 
+import io.casehub.connectors.slack.bot.SlackBotClient.ApiResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -200,7 +201,7 @@ class SlackBotClientTest {
     @Test
     void listChannels_returnsDiscoveredTargets() {
         wireMock.stubFor(get(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true"))
                 .willReturn(okJson("{\"ok\":true,\"channels\":["
                         + "{\"id\":\"C123ABC\",\"name\":\"general\"},"
                         + "{\"id\":\"C456DEF\",\"name\":\"engineering\"}"
@@ -218,20 +219,20 @@ class SlackBotClientTest {
     @Test
     void listChannels_sendsAuthorizationHeader() {
         wireMock.stubFor(get(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true"))
                 .willReturn(okJson("{\"ok\":true,\"channels\":[]}")));
 
         client.listChannels("xoxb-my-token");
 
         wireMock.verify(getRequestedFor(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true"))
                 .withHeader("Authorization", equalTo("Bearer xoxb-my-token")));
     }
 
     @Test
     void listChannels_slackReturnsNotOk_returnsEmptyList() {
         wireMock.stubFor(get(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true"))
                 .willReturn(okJson("{\"ok\":false,\"error\":\"invalid_auth\"}")));
 
         final List<DiscoveredTarget> result = client.listChannels("xoxb-bad");
@@ -241,7 +242,7 @@ class SlackBotClientTest {
 
     @Test
     void listChannels_twoPagesWithCursor_returnsBothPages() {
-        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true";
         final String page2Url = page1Url + "&cursor=cursor-page2";
 
         wireMock.stubFor(get(urlEqualTo(page1Url))
@@ -261,7 +262,7 @@ class SlackBotClientTest {
 
     @Test
     void listChannels_threePagesWithCursor_returnsAllPages() {
-        final String base = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String base = "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true";
 
         wireMock.stubFor(get(urlEqualTo(base))
                 .willReturn(okJson("{\"ok\":true,\"channels\":["
@@ -286,7 +287,7 @@ class SlackBotClientTest {
     void listChannels_cursorPresentInUrl_onlyOnSubsequentRequests() {
         // Use a realistic Slack cursor with '=' padding to verify URLEncoder.encode() is applied.
         // Without encoding, the client sends &cursor=dXNlcjpVMEc5V0ZYNlo= (stub won't match).
-        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true";
         final String rawCursor = "dXNlcjpVMEc5V0ZYNlo=";
         final String encodedCursor = "dXNlcjpVMEc5V0ZYNlo%3D";
         final String page2Url = page1Url + "&cursor=" + encodedCursor;
@@ -308,7 +309,7 @@ class SlackBotClientTest {
 
     @Test
     void listChannels_withCursor_paginatesWithoutWarning() {
-        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true";
         final String page2Url = page1Url + "&cursor=page2-cursor";
 
         wireMock.stubFor(get(urlEqualTo(page1Url))
@@ -328,7 +329,7 @@ class SlackBotClientTest {
 
     @Test
     void listChannels_midLoopApiError_returnsPartialWithWarning() {
-        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true";
         final String page2Url = page1Url + "&cursor=next-cursor";
 
         wireMock.stubFor(get(urlEqualTo(page1Url))
@@ -350,7 +351,7 @@ class SlackBotClientTest {
 
     @Test
     void listChannels_midLoopRateLimited_returnsPartialWithRatelimitedWarning() {
-        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200";
+        final String page1Url = "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true";
         final String page2Url = page1Url + "&cursor=next-cursor";
 
         wireMock.stubFor(get(urlEqualTo(page1Url))
@@ -388,7 +389,7 @@ class SlackBotClientTest {
     @Test
     void listChannels_responseIsNotTruncated_noWarningLogged() {
         wireMock.stubFor(get(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true"))
                 .willReturn(okJson("{\"ok\":true,\"channels\":["
                         + "{\"id\":\"C123ABC\",\"name\":\"general\"}"
                         + "]}")));
@@ -401,7 +402,7 @@ class SlackBotClientTest {
     @Test
     void listChannels_responseMetaPresentButNoCursor_noWarningLogged() {
         wireMock.stubFor(get(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true"))
                 .willReturn(okJson("{\"ok\":true,\"channels\":["
                         + "{\"id\":\"C123ABC\",\"name\":\"general\"}"
                         + "],\"response_metadata\":{}}")));
@@ -470,7 +471,7 @@ class SlackBotClientTest {
         wireMock.stubFor(post(urlEqualTo("/api/reactions.add"))
                 .willReturn(okJson("{\"ok\":true}")));
 
-        SlackBotClient.ReactionResult result = client.addReaction("tok", "C1", "1234567890.123456", "thumbsup");
+        ApiResult result = client.addReaction("tok", "C1", "1234567890.123456", "thumbsup");
 
         assertThat(result.ok()).isTrue();
         wireMock.verify(postRequestedFor(urlEqualTo("/api/reactions.add"))
@@ -484,7 +485,7 @@ class SlackBotClientTest {
         wireMock.stubFor(post(urlEqualTo("/api/reactions.remove"))
                 .willReturn(okJson("{\"ok\":true}")));
 
-        SlackBotClient.ReactionResult result = client.removeReaction("tok", "C1", "1234567890.123456", "thumbsup");
+        ApiResult result = client.removeReaction("tok", "C1", "1234567890.123456", "thumbsup");
 
         assertThat(result.ok()).isTrue();
     }
@@ -510,7 +511,7 @@ class SlackBotClientTest {
         wireMock.stubFor(post(urlEqualTo("/api/reactions.add"))
                 .willReturn(okJson("{\"ok\":false,\"error\":\"already_reacted\"}")));
 
-        SlackBotClient.ReactionResult result = client.addReaction("tok", "C1", "ts", "thumbsup");
+        ApiResult result = client.addReaction("tok", "C1", "ts", "thumbsup");
 
         assertThat(result.ok()).isFalse();
         assertThat(result.error()).isEqualTo("already_reacted");
@@ -597,7 +598,7 @@ class SlackBotClientTest {
         wireMock.stubFor(post(urlEqualTo("/api/conversations.invite"))
                 .willReturn(okJson("{\"ok\":true}")));
 
-        SlackBotClient.ReactionResult result = client.inviteToConversation("tok", "C1", "U1");
+        ApiResult result = client.inviteToConversation("tok", "C1", "U1");
 
         assertThat(result.ok()).isTrue();
     }
@@ -607,7 +608,7 @@ class SlackBotClientTest {
         wireMock.stubFor(post(urlEqualTo("/api/conversations.kick"))
                 .willReturn(okJson("{\"ok\":true}")));
 
-        SlackBotClient.ReactionResult result = client.kickFromConversation("tok", "C1", "U1");
+        ApiResult result = client.kickFromConversation("tok", "C1", "U1");
 
         assertThat(result.ok()).isTrue();
     }

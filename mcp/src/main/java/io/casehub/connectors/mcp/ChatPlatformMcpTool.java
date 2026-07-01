@@ -89,7 +89,7 @@ public class ChatPlatformMcpTool {
                         .footer(cardFooter)
                         .author(cardAuthor);
 
-                if (cardColor != null && !cardColor.isBlank()) {
+                if (isNotBlank(cardColor)) {
                     try {
                         builder.color(Integer.parseInt(cardColor));
                     } catch (final NumberFormatException e) {
@@ -97,7 +97,7 @@ public class ChatPlatformMcpTool {
                     }
                 }
 
-                if (cardFields != null && !cardFields.isBlank()) {
+                if (isNotBlank(cardFields)) {
                     try {
                         final var jsonArray = Json.createReader(
                                 new StringReader(cardFields)).readArray();
@@ -123,7 +123,7 @@ public class ChatPlatformMcpTool {
 
             final var content = new ChatContent(text, null, List.of(), cards);
             final SendResult result;
-            if (parentMessageId != null && !parentMessageId.isBlank()) {
+            if (isNotBlank(parentMessageId)) {
                 final var parentRef = new ChatMessageRef(
                         new ChatChannelRef(channel), parentMessageId);
                 result = p.threading().reply(parentRef, content);
@@ -171,9 +171,9 @@ public class ChatPlatformMcpTool {
                   .append(" (").append(ch.ref().id()).append(")");
                 if (ch.isPrivate()) sb.append(" [private]");
                 if (ch.memberCount() != null) sb.append(" [").append(ch.memberCount()).append(" members]");
-                if (ch.topic() != null && !ch.topic().isBlank())
+                if (isNotBlank(ch.topic()))
                     sb.append(" — ").append(ch.topic());
-                if (ch.description() != null && !ch.description().isBlank())
+                if (isNotBlank(ch.description()))
                     sb.append(" | ").append(ch.description());
                 sb.append("\n");
             }
@@ -187,9 +187,13 @@ public class ChatPlatformMcpTool {
         }
     }
 
+    private static boolean isNotBlank(final String s) {
+        return s != null && !s.isBlank();
+    }
+
     private static boolean hasAnyCardParam(final String... params) {
         for (final String p : params) {
-            if (p != null && !p.isBlank()) return true;
+            if (isNotBlank(p)) return true;
         }
         return false;
     }

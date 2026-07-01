@@ -584,7 +584,7 @@ public class DiscordClient {
             return new DiscordGuild(
                     guild.get("id").asText(),
                     guild.get("name").asText(),
-                    guild.has("approximate_member_count") ? guild.get("approximate_member_count").asInt() : 0
+                    guild.has("approximate_member_count") ? guild.get("approximate_member_count").asInt() : null
             );
 
         } catch (final Exception e) {

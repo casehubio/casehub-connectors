@@ -44,7 +44,7 @@ class SlackBotDiscoveryTest {
     @Test
     void discover_delegatesToClient_withConfiguredToken() {
         wireMock.stubFor(get(urlEqualTo(
-                "/api/conversations.list?types=public_channel,private_channel&limit=200"))
+                "/api/conversations.list?types=public_channel,private_channel&limit=200&include_num_members=true"))
                 .willReturn(okJson("{\"ok\":true,\"channels\":["
                         + "{\"id\":\"C111\",\"name\":\"general\"}"
                         + "]}")));

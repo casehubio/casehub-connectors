@@ -218,13 +218,14 @@ class DiscordChatPlatformTest {
                                   {"id": "ch-forum", "name": "forum", "topic": "", "type": 15}
                                 ]
                                 """)));
-        wireMock.stubFor(get(urlPathEqualTo("/api/v10/guilds/test-guild-123"))
+        wireMock.stubFor(get(urlEqualTo("/guilds/test-guild-123?with_counts=true"))
                 .willReturn(okJson("{\"id\":\"test-guild-123\",\"name\":\"Test Guild\",\"approximate_member_count\":10}")));
 
         List<Channel> channels = platform.discovery().listChannels();
 
         assertThat(channels).hasSize(1);
         assertThat(channels.get(0).name()).isEqualTo("general");
+        assertThat(channels.get(0).memberCount()).isEqualTo(10);
     }
 
     @Test

@@ -5,7 +5,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.casehub.connectors.ConnectorMeshBridge;
 import io.casehub.connectors.chat.ChatPlatformService;
 import io.casehub.connectors.chat.model.*;
 import io.casehub.connectors.chat.ref.InMemoryChatBackend;
@@ -17,7 +16,7 @@ class ChatPlatformMcpToolTest {
 
     private ChatPlatformMcpTool tool;
     private InMemoryChatBackend backend;
-    private RecordingBridge bridge;
+    private McpToolTestSupport.RecordingBridge bridge;
 
     @BeforeEach
     void setUp() {
@@ -25,7 +24,7 @@ class ChatPlatformMcpToolTest {
         backend.createChannel("general", "topic", "desc", false);
         final var refPlatform = new RefChatPlatform(backend);
         final var service = new ChatPlatformService(List.of(refPlatform));
-        bridge = new RecordingBridge();
+        bridge = new McpToolTestSupport.RecordingBridge();
         tool = new ChatPlatformMcpTool(service, bridge);
     }
 
@@ -96,12 +95,56 @@ class ChatPlatformMcpToolTest {
         assertThat(bridge.calls.getFirst().connectorId()).isEqualTo("ref");
     }
 
-    static class RecordingBridge implements ConnectorMeshBridge {
-        final java.util.List<Call> calls = new java.util.ArrayList<>();
-        record Call(String connectorId, String destination, String content) {}
-        @Override
-        public void notifyDelivered(String connectorId, String destination, String content) {
-            calls.add(new Call(connectorId, destination, content));
-        }
+    @Test
+    void sendChatWithCardColor() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                "Alert", null, "16711680", null, null, null, null, null, null);
+
+        assertThat(result).startsWith("Sent to ");
+        final var messages = backend.messages(new ChatChannelRef(channelId),
+                java.time.Instant.EPOCH);
+        assertThat(messages).hasSize(1);
+        final var card = messages.getFirst().content().cards().getFirst();
+        assertThat(card.title()).isEqualTo("Alert");
+        assertThat(card.color()).isEqualTo(16711680);
+    }
+
+    @Test
+    void sendChatWithCardColorInvalid() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                "Alert", null, "not-a-number", null, null, null, null, null, null);
+
+        assertThat(result).isEqualTo("Failed: cardColor must be a decimal integer");
+    }
+
+    @Test
+    void sendChatWithCardFields() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var fields = """
+                [{"name":"Status","value":"Running","inline":true},{"name":"Count","value":"5","inline":false}]""";
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                "Deploy", null, null, null, null, null, null, null, fields);
+
+        assertThat(result).startsWith("Sent to ");
+        final var messages = backend.messages(new ChatChannelRef(channelId),
+                java.time.Instant.EPOCH);
+        assertThat(messages).hasSize(1);
+        final var card = messages.getFirst().content().cards().getFirst();
+        assertThat(card.fields()).hasSize(2);
+        assertThat(card.fields().get(0).name()).isEqualTo("Status");
+        assertThat(card.fields().get(0).inline()).isTrue();
+        assertThat(card.fields().get(1).name()).isEqualTo("Count");
+        assertThat(card.fields().get(1).inline()).isFalse();
+    }
+
+    @Test
+    void sendChatWithCardFieldsInvalid() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                "Deploy", null, null, null, null, null, null, null, "not-json");
+
+        assertThat(result).startsWith("Failed: cardFields must be a JSON array");
     }
 }

@@ -9,12 +9,14 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
+import jakarta.json.JsonString;
 import jakarta.json.JsonValue;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -107,54 +109,12 @@ public class SlackBotClient {
      * @return list of conversations with full detail; empty if the first request fails
      */
     public List<ConversationInfo> listConversations(final String token) {
-        final List<ConversationInfo> accumulated = new ArrayList<>();
-        String cursor = "";
-        int pageNum = 0;
-        while (pageNum < MAX_PAGES) {
-            final String query = cursor.isBlank()
-                    ? LIST_BASE_QUERY
-                    : LIST_BASE_QUERY + "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8);
-            try {
-                final HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(apiBaseUrl + LIST_PATH + query))
-                        .header("Authorization", "Bearer " + token)
-                        .timeout(REQUEST_TIMEOUT)
-                        .GET()
-                        .build();
-                final HttpResponse<String> response =
-                        HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-                final ConversationPageResult result = parseConversationPage(response.body());
-                if (!result.ok()) {
-                    LOG.warning(String.format(
-                            "SlackBotClient: listConversations stopped after %d complete page(s) — returned %d channels: %s",
-                            pageNum, accumulated.size(), result.error()));
-                    return List.copyOf(accumulated);
-                }
-                accumulated.addAll(result.conversations());
-                pageNum++;
-                cursor = result.nextCursor();
-                if (cursor.isBlank()) {
-                    break;
-                }
-            } catch (final InterruptedException e) {
-                Thread.currentThread().interrupt();
-                LOG.warning(String.format(
-                        "SlackBotClient: listConversations interrupted after %d complete page(s) — returned %d channels",
-                        pageNum, accumulated.size()));
-                return List.copyOf(accumulated);
-            } catch (final Exception e) {
-                LOG.warning(String.format(
-                        "SlackBotClient: listConversations error after %d complete page(s) — returned %d channels: %s",
-                        pageNum, accumulated.size(), e.getMessage()));
-                return List.copyOf(accumulated);
-            }
-        }
-        if (!cursor.isBlank()) {
-            LOG.warning(String.format(
-                    "SlackBotClient: listConversations capped at %d pages — returned %d channels (workspace may have more)",
-                    MAX_PAGES, accumulated.size()));
-        }
-        return List.copyOf(accumulated);
+        return paginateGet(token,
+                cursor -> apiBaseUrl + LIST_PATH
+                        + (cursor.isBlank() ? LIST_BASE_QUERY
+                                : LIST_BASE_QUERY + "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8)),
+                this::parseConversationPage,
+                "listConversations", "channels");
     }
 
     /**
@@ -180,8 +140,8 @@ public class SlackBotClient {
      * @param emoji     emoji name without colons (e.g. {@code thumbsup})
      * @return the result of the API call
      */
-    public ReactionResult addReaction(final String token, final String channel,
-                                      final String timestamp, final String emoji) {
+    public ApiResult addReaction(final String token, final String channel,
+                                 final String timestamp, final String emoji) {
         final String json = Json.createObjectBuilder()
                 .add("channel", channel)
                 .add("timestamp", timestamp)
@@ -199,8 +159,8 @@ public class SlackBotClient {
      * @param emoji     emoji name without colons
      * @return the result of the API call
      */
-    public ReactionResult removeReaction(final String token, final String channel,
-                                         final String timestamp, final String emoji) {
+    public ApiResult removeReaction(final String token, final String channel,
+                                    final String timestamp, final String emoji) {
         final String json = Json.createObjectBuilder()
                 .add("channel", channel)
                 .add("timestamp", timestamp)
@@ -239,7 +199,7 @@ public class SlackBotClient {
         }
     }
 
-    private ReactionResult sendReactionRequest(final String token, final String path, final String json) {
+    private ApiResult sendReactionRequest(final String token, final String path, final String json) {
         try {
             final HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(apiBaseUrl + path))
@@ -253,22 +213,22 @@ public class SlackBotClient {
             return parseReactionResponse(response.body());
         } catch (final Exception e) {
             LOG.warning("SlackBotClient: reaction request error — " + e.getMessage());
-            return new ReactionResult(false, "http-error");
+            return new ApiResult(false, "http-error");
         }
     }
 
-    private ReactionResult parseReactionResponse(final String body) {
+    private ApiResult parseReactionResponse(final String body) {
         if (body == null || body.isBlank()) {
-            return new ReactionResult(false, "empty-response");
+            return new ApiResult(false, "empty-response");
         }
         try (var reader = Json.createReader(new StringReader(body))) {
             final JsonObject json = reader.readObject();
             final boolean ok = json.getBoolean("ok", false);
             final String error = !ok ? json.getString("error", null) : null;
-            return new ReactionResult(ok, error);
+            return new ApiResult(ok, error);
         } catch (final Exception e) {
             LOG.warning("SlackBotClient: failed to parse reaction response — " + e.getMessage());
-            return new ReactionResult(false, "parse-error");
+            return new ApiResult(false, "parse-error");
         }
     }
 
@@ -330,55 +290,13 @@ public class SlackBotClient {
      * @return list of user IDs
      */
     public List<String> listConversationMembers(final String token, final String channelId) {
-        final List<String> accumulated = new ArrayList<>();
-        String cursor = "";
-        int pageNum = 0;
-        while (pageNum < MAX_PAGES) {
-            final String url = apiBaseUrl + "/api/conversations.members?channel="
-                    + URLEncoder.encode(channelId, StandardCharsets.UTF_8)
-                    + "&limit=200"
-                    + (cursor.isBlank() ? "" : "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8));
-            try {
-                final HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .header("Authorization", "Bearer " + token)
-                        .timeout(REQUEST_TIMEOUT)
-                        .GET()
-                        .build();
-                final HttpResponse<String> response =
-                        HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-                final MembersPageResult result = parseMembersPage(response.body());
-                if (!result.ok()) {
-                    LOG.warning(String.format(
-                            "SlackBotClient: listConversationMembers stopped after %d complete page(s) — returned %d members: %s",
-                            pageNum, accumulated.size(), result.error()));
-                    return List.copyOf(accumulated);
-                }
-                accumulated.addAll(result.members());
-                pageNum++;
-                cursor = result.nextCursor();
-                if (cursor.isBlank()) {
-                    break;
-                }
-            } catch (final InterruptedException e) {
-                Thread.currentThread().interrupt();
-                LOG.warning(String.format(
-                        "SlackBotClient: listConversationMembers interrupted after %d complete page(s) — returned %d members",
-                        pageNum, accumulated.size()));
-                return List.copyOf(accumulated);
-            } catch (final Exception e) {
-                LOG.warning(String.format(
-                        "SlackBotClient: listConversationMembers error after %d complete page(s) — returned %d members: %s",
-                        pageNum, accumulated.size(), e.getMessage()));
-                return List.copyOf(accumulated);
-            }
-        }
-        if (!cursor.isBlank()) {
-            LOG.warning(String.format(
-                    "SlackBotClient: listConversationMembers capped at %d pages — returned %d members",
-                    MAX_PAGES, accumulated.size()));
-        }
-        return List.copyOf(accumulated);
+        return paginateGet(token,
+                cursor -> apiBaseUrl + "/api/conversations.members?channel="
+                        + URLEncoder.encode(channelId, StandardCharsets.UTF_8)
+                        + "&limit=200"
+                        + (cursor.isBlank() ? "" : "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8)),
+                this::parseMembersPage,
+                "listConversationMembers", "members");
     }
 
     /**
@@ -388,29 +306,38 @@ public class SlackBotClient {
      * @return list of user info
      */
     public List<UserInfo> listUsers(final String token) {
-        final List<UserInfo> accumulated = new ArrayList<>();
+        return paginateGet(token,
+                cursor -> apiBaseUrl + "/api/users.list?limit=200"
+                        + (cursor.isBlank() ? "" : "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8)),
+                this::parseUsersPage,
+                "listUsers", "users");
+    }
+
+    private <T> List<T> paginateGet(final String token,
+                                     final Function<String, String> urlBuilder,
+                                     final Function<String, PageSlice<T>> parser,
+                                     final String method, final String resource) {
+        final List<T> accumulated = new ArrayList<>();
         String cursor = "";
         int pageNum = 0;
         while (pageNum < MAX_PAGES) {
-            final String url = apiBaseUrl + "/api/users.list?limit=200"
-                    + (cursor.isBlank() ? "" : "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8));
             try {
                 final HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
+                        .uri(URI.create(urlBuilder.apply(cursor)))
                         .header("Authorization", "Bearer " + token)
                         .timeout(REQUEST_TIMEOUT)
                         .GET()
                         .build();
                 final HttpResponse<String> response =
                         HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-                final UsersPageResult result = parseUsersPage(response.body());
+                final PageSlice<T> result = parser.apply(response.body());
                 if (!result.ok()) {
                     LOG.warning(String.format(
-                            "SlackBotClient: listUsers stopped after %d complete page(s) — returned %d users: %s",
-                            pageNum, accumulated.size(), result.error()));
+                            "SlackBotClient: %s stopped after %d complete page(s) — returned %d %s: %s",
+                            method, pageNum, accumulated.size(), resource, result.error()));
                     return List.copyOf(accumulated);
                 }
-                accumulated.addAll(result.users());
+                accumulated.addAll(result.items());
                 pageNum++;
                 cursor = result.nextCursor();
                 if (cursor.isBlank()) {
@@ -419,20 +346,20 @@ public class SlackBotClient {
             } catch (final InterruptedException e) {
                 Thread.currentThread().interrupt();
                 LOG.warning(String.format(
-                        "SlackBotClient: listUsers interrupted after %d complete page(s) — returned %d users",
-                        pageNum, accumulated.size()));
+                        "SlackBotClient: %s interrupted after %d complete page(s) — returned %d %s",
+                        method, pageNum, accumulated.size(), resource));
                 return List.copyOf(accumulated);
             } catch (final Exception e) {
                 LOG.warning(String.format(
-                        "SlackBotClient: listUsers error after %d complete page(s) — returned %d users: %s",
-                        pageNum, accumulated.size(), e.getMessage()));
+                        "SlackBotClient: %s error after %d complete page(s) — returned %d %s: %s",
+                        method, pageNum, accumulated.size(), resource, e.getMessage()));
                 return List.copyOf(accumulated);
             }
         }
         if (!cursor.isBlank()) {
             LOG.warning(String.format(
-                    "SlackBotClient: listUsers capped at %d pages — returned %d users",
-                    MAX_PAGES, accumulated.size()));
+                    "SlackBotClient: %s capped at %d pages — returned %d %s (workspace may have more)",
+                    method, MAX_PAGES, accumulated.size(), resource));
         }
         return List.copyOf(accumulated);
     }
@@ -455,35 +382,35 @@ public class SlackBotClient {
         }
     }
 
-    private MembersPageResult parseMembersPage(final String body) {
+    private PageSlice<String> parseMembersPage(final String body) {
         if (body == null || body.isBlank()) {
-            return new MembersPageResult(false, List.of(), "", "empty-response");
+            return new PageSlice<>(false, List.of(), "", "empty-response");
         }
         try (var reader = Json.createReader(new StringReader(body))) {
             final JsonObject obj = reader.readObject();
             if (!obj.getBoolean("ok", false)) {
-                return new MembersPageResult(false, List.of(), "", obj.getString("error", ""));
+                return new PageSlice<>(false, List.of(), "", obj.getString("error", ""));
             }
             final String nextCursor = obj.containsKey("response_metadata")
                     ? obj.getJsonObject("response_metadata").getString("next_cursor", "")
                     : "";
             final List<String> members = obj.getJsonArray("members").stream()
-                    .map(v -> v.toString().replace("\"", ""))
+                    .map(v -> ((JsonString) v).getString())
                     .toList();
-            return new MembersPageResult(true, members, nextCursor, "");
+            return new PageSlice<>(true, members, nextCursor, "");
         } catch (final Exception e) {
-            return new MembersPageResult(false, List.of(), "", "parse-error");
+            return new PageSlice<>(false, List.of(), "", "parse-error");
         }
     }
 
-    private UsersPageResult parseUsersPage(final String body) {
+    private PageSlice<UserInfo> parseUsersPage(final String body) {
         if (body == null || body.isBlank()) {
-            return new UsersPageResult(false, List.of(), "", "empty-response");
+            return new PageSlice<>(false, List.of(), "", "empty-response");
         }
         try (var reader = Json.createReader(new StringReader(body))) {
             final JsonObject obj = reader.readObject();
             if (!obj.getBoolean("ok", false)) {
-                return new UsersPageResult(false, List.of(), "", obj.getString("error", ""));
+                return new PageSlice<>(false, List.of(), "", obj.getString("error", ""));
             }
             final String nextCursor = obj.containsKey("response_metadata")
                     ? obj.getJsonObject("response_metadata").getString("next_cursor", "")
@@ -498,9 +425,9 @@ public class SlackBotClient {
                         return new UserInfo(id, displayName, realName);
                     })
                     .toList();
-            return new UsersPageResult(true, users, nextCursor, "");
+            return new PageSlice<>(true, users, nextCursor, "");
         } catch (final Exception e) {
-            return new UsersPageResult(false, List.of(), "", "parse-error");
+            return new PageSlice<>(false, List.of(), "", "parse-error");
         }
     }
 
@@ -552,9 +479,9 @@ public class SlackBotClient {
      * @param token     bot token ({@code xoxb-…})
      * @param channelId Slack channel ID
      * @param userId    Slack user ID
-     * @return reaction result
+     * @return the result of the API call
      */
-    public ReactionResult inviteToConversation(final String token, final String channelId, final String userId) {
+    public ApiResult inviteToConversation(final String token, final String channelId, final String userId) {
         final String json = Json.createObjectBuilder()
                 .add("channel", channelId)
                 .add("users", userId)
@@ -568,9 +495,9 @@ public class SlackBotClient {
      * @param token     bot token ({@code xoxb-…})
      * @param channelId Slack channel ID
      * @param userId    Slack user ID
-     * @return reaction result
+     * @return the result of the API call
      */
-    public ReactionResult kickFromConversation(final String token, final String channelId, final String userId) {
+    public ApiResult kickFromConversation(final String token, final String channelId, final String userId) {
         final String json = Json.createObjectBuilder()
                 .add("channel", channelId)
                 .add("user", userId)
@@ -596,7 +523,7 @@ public class SlackBotClient {
         }
     }
 
-    private ReactionResult sendSimpleRequest(final String token, final String path, final String json) {
+    private ApiResult sendSimpleRequest(final String token, final String path, final String json) {
         try {
             final HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(apiBaseUrl + path))
@@ -610,7 +537,7 @@ public class SlackBotClient {
             return parseReactionResponse(response.body());
         } catch (final Exception e) {
             LOG.warning("SlackBotClient: simple request error — " + e.getMessage());
-            return new ReactionResult(false, "http-error");
+            return new ApiResult(false, "http-error");
         }
     }
 
@@ -704,14 +631,14 @@ public class SlackBotClient {
         }
     }
 
-    private ConversationPageResult parseConversationPage(final String body) {
+    private PageSlice<ConversationInfo> parseConversationPage(final String body) {
         if (body == null || body.isBlank()) {
-            return new ConversationPageResult(false, List.of(), "", "empty-response");
+            return new PageSlice<>(false, List.of(), "", "empty-response");
         }
         try (var reader = Json.createReader(new StringReader(body))) {
             final JsonObject obj = reader.readObject();
             if (!obj.getBoolean("ok", false)) {
-                return new ConversationPageResult(false, List.of(), "", obj.getString("error", ""));
+                return new PageSlice<>(false, List.of(), "", obj.getString("error", ""));
             }
             final String nextCursor = obj.containsKey("response_metadata")
                     ? obj.getJsonObject("response_metadata").getString("next_cursor", "")
@@ -733,33 +660,12 @@ public class SlackBotClient {
                         return new ConversationInfo(id, name, topic, purpose, isPrivate, numMembers);
                     })
                     .toList();
-            return new ConversationPageResult(true, conversations, nextCursor, "");
+            return new PageSlice<>(true, conversations, nextCursor, "");
         } catch (final Exception e) {
-            return new ConversationPageResult(false, List.of(), "", "parse-error");
+            return new PageSlice<>(false, List.of(), "", "parse-error");
         }
     }
 
-    private PageResult parsePage(final String body) {
-        if (body == null || body.isBlank()) {
-            return new PageResult(false, List.of(), "", "empty-response");
-        }
-        try (var reader = Json.createReader(new StringReader(body))) {
-            final JsonObject obj = reader.readObject();
-            if (!obj.getBoolean("ok", false)) {
-                return new PageResult(false, List.of(), "", obj.getString("error", ""));
-            }
-            final String nextCursor = obj.containsKey("response_metadata")
-                    ? obj.getJsonObject("response_metadata").getString("next_cursor", "")
-                    : "";
-            final List<DiscoveredTarget> channels = obj.getJsonArray("channels").stream()
-                    .map(JsonValue::asJsonObject)
-                    .map(ch -> new DiscoveredTarget(ch.getString("id"), "#" + ch.getString("name")))
-                    .toList();
-            return new PageResult(true, channels, nextCursor, "");
-        } catch (final Exception e) {
-            return new PageResult(false, List.of(), "", "parse-error");
-        }
-    }
 
     private PostResult sendWithRetry(final HttpRequest request) {
         try {
@@ -830,15 +736,12 @@ public class SlackBotClient {
         }
     }
 
-    private record PageResult(boolean ok, List<DiscoveredTarget> channels, String nextCursor, String error) {}
-    private record ConversationPageResult(boolean ok, List<ConversationInfo> conversations, String nextCursor, String error) {}
-    private record MembersPageResult(boolean ok, List<String> members, String nextCursor, String error) {}
-    private record UsersPageResult(boolean ok, List<UserInfo> users, String nextCursor, String error) {}
+    private record PageSlice<T>(boolean ok, List<T> items, String nextCursor, String error) {}
 
     public record PostResult(boolean ok, String ts, String error) {}
     public record ConversationInfo(String id, String name, String topic, String purpose, boolean isPrivate, Integer numMembers) {}
     public record ConversationResult(boolean ok, ConversationInfo info, String error) {}
-    public record ReactionResult(boolean ok, String error) {}
+    public record ApiResult(boolean ok, String error) {}
     public record ReactionListResult(boolean ok, List<String> emojis, String error) {}
     public record PresenceResult(boolean ok, String presence, String error) {}
     public record UserInfo(String id, String displayName, String realName) {}
