@@ -32,7 +32,7 @@ class ChatPlatformMcpToolTest {
     void sendChatPlainText() {
         final var channelId = backend.listChannels().getFirst().ref().id();
         final var result = tool.sendChat("ref", channelId, "hello", null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
 
         assertThat(result).startsWith("Sent to ");
         assertThat(backend.messages(new ChatChannelRef(channelId),
@@ -43,7 +43,7 @@ class ChatPlatformMcpToolTest {
     void sendChatWithRichCard() {
         final var channelId = backend.listChannels().getFirst().ref().id();
         final var result = tool.sendChat("ref", channelId, "fallback", null,
-                "Deploy", "3 services", null, null, null, null, null, null, null);
+                "Deploy", "3 services", null, null, null, null, null, null, null, null);
 
         assertThat(result).startsWith("Sent to ");
         final var messages = backend.messages(new ChatChannelRef(channelId),
@@ -57,7 +57,7 @@ class ChatPlatformMcpToolTest {
     @Test
     void sendChatUnknownPlatform() {
         final var result = tool.sendChat("nonexistent", "ch", "hi", null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         assertThat(result).startsWith("Failed:");
     }
 
@@ -65,12 +65,12 @@ class ChatPlatformMcpToolTest {
     void sendChatWithThread() {
         final var channelId = backend.listChannels().getFirst().ref().id();
         final var firstResult = tool.sendChat("ref", channelId, "parent", null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         assertThat(firstResult).contains("messageId=");
 
         final var messageId = firstResult.replaceAll(".*messageId=([^)]+)\\).*", "$1");
         final var replyResult = tool.sendChat("ref", channelId, "reply", messageId,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         assertThat(replyResult).startsWith("Sent to ");
     }
 
@@ -90,7 +90,7 @@ class ChatPlatformMcpToolTest {
     void meshBridgeNotified() {
         final var channelId = backend.listChannels().getFirst().ref().id();
         tool.sendChat("ref", channelId, "hello", null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         assertThat(bridge.calls).hasSize(1);
         assertThat(bridge.calls.getFirst().connectorId()).isEqualTo("ref");
     }
@@ -99,7 +99,7 @@ class ChatPlatformMcpToolTest {
     void sendChatWithCardColor() {
         final var channelId = backend.listChannels().getFirst().ref().id();
         final var result = tool.sendChat("ref", channelId, "fallback", null,
-                "Alert", null, "16711680", null, null, null, null, null, null);
+                "Alert", null, "16711680", null, null, null, null, null, null, null);
 
         assertThat(result).startsWith("Sent to ");
         final var messages = backend.messages(new ChatChannelRef(channelId),
@@ -114,7 +114,7 @@ class ChatPlatformMcpToolTest {
     void sendChatWithCardColorInvalid() {
         final var channelId = backend.listChannels().getFirst().ref().id();
         final var result = tool.sendChat("ref", channelId, "fallback", null,
-                "Alert", null, "not-a-number", null, null, null, null, null, null);
+                "Alert", null, "not-a-number", null, null, null, null, null, null, null);
 
         assertThat(result).isEqualTo("Failed: cardColor must be a decimal integer");
     }
@@ -125,7 +125,7 @@ class ChatPlatformMcpToolTest {
         final var fields = """
                 [{"name":"Status","value":"Running","inline":true},{"name":"Count","value":"5","inline":false}]""";
         final var result = tool.sendChat("ref", channelId, "fallback", null,
-                "Deploy", null, null, null, null, null, null, null, fields);
+                "Deploy", null, null, null, null, null, null, null, fields, null);
 
         assertThat(result).startsWith("Sent to ");
         final var messages = backend.messages(new ChatChannelRef(channelId),
@@ -143,8 +143,67 @@ class ChatPlatformMcpToolTest {
     void sendChatWithCardFieldsInvalid() {
         final var channelId = backend.listChannels().getFirst().ref().id();
         final var result = tool.sendChat("ref", channelId, "fallback", null,
-                "Deploy", null, null, null, null, null, null, null, "not-json");
+                "Deploy", null, null, null, null, null, null, null, "not-json", null);
 
         assertThat(result).startsWith("Failed: cardFields must be a JSON array");
+    }
+
+    @Test
+    void sendChatWithMultipleCards() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var cardsJson = """
+                [{"title":"Card 1","description":"First"},{"title":"Card 2","description":"Second"}]""";
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                null, null, null, null, null, null, null, null, null, cardsJson);
+
+        assertThat(result).startsWith("Sent to ");
+        final var messages = backend.messages(new ChatChannelRef(channelId),
+                java.time.Instant.EPOCH);
+        assertThat(messages).hasSize(1);
+        assertThat(messages.getFirst().content().cards()).hasSize(2);
+        assertThat(messages.getFirst().content().cards().get(0).title()).isEqualTo("Card 1");
+        assertThat(messages.getFirst().content().cards().get(1).title()).isEqualTo("Card 2");
+    }
+
+    @Test
+    void sendChatWithMultipleCardsOverridesFlatParams() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var cardsJson = """
+                [{"title":"Array Card"}]""";
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                "Flat Card", "flat desc", null, null, null, null, null, null, null, cardsJson);
+
+        assertThat(result).startsWith("Sent to ");
+        final var messages = backend.messages(new ChatChannelRef(channelId),
+                java.time.Instant.EPOCH);
+        final var cards = messages.getFirst().content().cards();
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().title()).isEqualTo("Array Card");
+    }
+
+    @Test
+    void sendChatWithMultipleCardsWithColorAndFields() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var cardsJson = """
+                [{"title":"Status","color":255,"fields":[{"name":"Env","value":"prod","inline":true}]}]""";
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                null, null, null, null, null, null, null, null, null, cardsJson);
+
+        assertThat(result).startsWith("Sent to ");
+        final var card = backend.messages(new ChatChannelRef(channelId),
+                java.time.Instant.EPOCH).getFirst().content().cards().getFirst();
+        assertThat(card.title()).isEqualTo("Status");
+        assertThat(card.color()).isEqualTo(255);
+        assertThat(card.fields()).hasSize(1);
+        assertThat(card.fields().getFirst().name()).isEqualTo("Env");
+    }
+
+    @Test
+    void sendChatWithMultipleCardsInvalidJson() {
+        final var channelId = backend.listChannels().getFirst().ref().id();
+        final var result = tool.sendChat("ref", channelId, "fallback", null,
+                null, null, null, null, null, null, null, null, null, "not-json");
+
+        assertThat(result).isEqualTo("Failed: cards must be a JSON array of card objects");
     }
 }

@@ -37,7 +37,8 @@ public class ChatPlatformMcpTool {
     @Tool(name = "send_chat",
           description = "Sends a message to a chat channel on any configured platform "
                       + "(slack, discord, irc, ref). Supports optional rich content via "
-                      + "card parameters (title, description, fields, images). "
+                      + "card parameters (title, description, fields, images) or a JSON "
+                      + "array of multiple cards. "
                       + "Returns 'Sent to <channel> (messageId=<id>)' on success.")
     @Blocking
     public String sendChat(
@@ -73,55 +74,36 @@ public class ChatPlatformMcpTool {
             @ToolArg(description = "Card fields as JSON array: "
                                  + "[{\"name\":\"...\",\"value\":\"...\",\"inline\":true}].",
                      required = false)
-            final String cardFields) {
+            final String cardFields,
+            @ToolArg(description = "Multiple cards as JSON array. Each object supports: "
+                                 + "title, description, color (decimal int), url, thumbnailUrl, "
+                                 + "imageUrl, footer, author, fields (array of {name,value,inline}). "
+                                 + "When present, overrides the flat card parameters above.",
+                     required = false)
+            final String cards) {
         try {
             final ChatPlatform p = platformService.platform(platform);
 
-            final List<RichCard> cards;
-            if (hasAnyCardParam(cardTitle, cardDescription, cardColor, cardUrl,
+            final List<RichCard> richCards;
+            if (isNotBlank(cards)) {
+                try {
+                    richCards = parseCardsArray(cards);
+                } catch (final IllegalArgumentException e) {
+                    return "Failed: " + e.getMessage();
+                }
+            } else if (hasAnyCardParam(cardTitle, cardDescription, cardColor, cardUrl,
                     cardThumbnailUrl, cardImageUrl, cardFooter, cardAuthor, cardFields)) {
-                final var builder = RichCard.builder()
-                        .title(cardTitle)
-                        .description(cardDescription)
-                        .url(cardUrl)
-                        .thumbnailUrl(cardThumbnailUrl)
-                        .imageUrl(cardImageUrl)
-                        .footer(cardFooter)
-                        .author(cardAuthor);
-
-                if (isNotBlank(cardColor)) {
-                    try {
-                        builder.color(Integer.parseInt(cardColor));
-                    } catch (final NumberFormatException e) {
-                        return "Failed: cardColor must be a decimal integer";
-                    }
+                try {
+                    richCards = List.of(parseSingleCard(cardTitle, cardDescription, cardColor,
+                            cardUrl, cardThumbnailUrl, cardImageUrl, cardFooter, cardAuthor, cardFields));
+                } catch (final IllegalArgumentException e) {
+                    return "Failed: " + e.getMessage();
                 }
-
-                if (isNotBlank(cardFields)) {
-                    try {
-                        final var jsonArray = Json.createReader(
-                                new StringReader(cardFields)).readArray();
-                        final List<RichCard.Field> fields = new ArrayList<>();
-                        for (final var jv : jsonArray) {
-                            final var jo = jv.asJsonObject();
-                            fields.add(new RichCard.Field(
-                                    jo.getString("name"),
-                                    jo.getString("value"),
-                                    jo.getBoolean("inline", false)));
-                        }
-                        builder.fields(fields);
-                    } catch (final Exception e) {
-                        return "Failed: cardFields must be a JSON array of "
-                             + "{name, value, inline} objects";
-                    }
-                }
-
-                cards = List.of(builder.build());
             } else {
-                cards = List.of();
+                richCards = List.of();
             }
 
-            final var content = new ChatContent(text, null, List.of(), cards);
+            final var content = new ChatContent(text, null, List.of(), richCards);
             final SendResult result;
             if (isNotBlank(parentMessageId)) {
                 final var parentRef = new ChatMessageRef(
@@ -185,6 +167,77 @@ public class ChatPlatformMcpTool {
                     e.getClass().getSimpleName(), e.getMessage());
             return "Failed: " + e.getMessage();
         }
+    }
+
+    private static List<RichCard> parseCardsArray(final String json) {
+        try {
+            final var jsonArray = Json.createReader(new StringReader(json)).readArray();
+            final List<RichCard> result = new ArrayList<>();
+            for (final var jv : jsonArray) {
+                final var jo = jv.asJsonObject();
+                final var builder = RichCard.builder()
+                        .title(jo.getString("title", null))
+                        .description(jo.getString("description", null))
+                        .url(jo.getString("url", null))
+                        .thumbnailUrl(jo.getString("thumbnailUrl", null))
+                        .imageUrl(jo.getString("imageUrl", null))
+                        .footer(jo.getString("footer", null))
+                        .author(jo.getString("author", null));
+                if (jo.containsKey("color") && !jo.isNull("color")) {
+                    builder.color(jo.getInt("color"));
+                }
+                if (jo.containsKey("fields") && !jo.isNull("fields")) {
+                    builder.fields(parseFields(jo.getJsonArray("fields")));
+                }
+                result.add(builder.build());
+            }
+            return List.copyOf(result);
+        } catch (final Exception e) {
+            throw new IllegalArgumentException(
+                    "cards must be a JSON array of card objects");
+        }
+    }
+
+    private static RichCard parseSingleCard(final String title, final String description,
+                                            final String color, final String url,
+                                            final String thumbnailUrl, final String imageUrl,
+                                            final String footer, final String author,
+                                            final String fields) {
+        final var builder = RichCard.builder()
+                .title(title).description(description).url(url)
+                .thumbnailUrl(thumbnailUrl).imageUrl(imageUrl)
+                .footer(footer).author(author);
+        if (isNotBlank(color)) {
+            try {
+                builder.color(Integer.parseInt(color));
+            } catch (final NumberFormatException e) {
+                throw new IllegalArgumentException("cardColor must be a decimal integer");
+            }
+        }
+        if (isNotBlank(fields)) {
+            try {
+                builder.fields(parseFields(
+                        Json.createReader(new StringReader(fields)).readArray()));
+            } catch (final IllegalArgumentException e) {
+                throw e;
+            } catch (final Exception e) {
+                throw new IllegalArgumentException(
+                        "cardFields must be a JSON array of {name, value, inline} objects");
+            }
+        }
+        return builder.build();
+    }
+
+    private static List<RichCard.Field> parseFields(final jakarta.json.JsonArray jsonArray) {
+        final List<RichCard.Field> result = new ArrayList<>();
+        for (final var jv : jsonArray) {
+            final var jo = jv.asJsonObject();
+            result.add(new RichCard.Field(
+                    jo.getString("name"),
+                    jo.getString("value"),
+                    jo.getBoolean("inline", false)));
+        }
+        return List.copyOf(result);
     }
 
     private static boolean isNotBlank(final String s) {
