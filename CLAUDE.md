@@ -107,7 +107,7 @@ type: java
 
 ## What This Project Is
 
-Outbound and inbound message connector library for the casehubio platform. Provides a `Connector` CDI SPI (outbound) and `InboundConnector`/`WebhookInboundConnector` SPIs (inbound) with built-in implementations for Slack, Teams, Twilio SMS, WhatsApp, and email. Also provides a `ChatPlatform` SPI (`chat-spi`) for structured interaction with chat systems (channels, threads, reactions, presence, members, channel management, member management, message history) with graceful degradation across platforms. ChatPlatform model includes `RichCard` for platform-agnostic rich content and `Channel` with `memberCount`. ChatPlatform implementations: `chat-ref` (in-memory reference), `chat-irc` (IRC with 3 native capabilities), `chat-discord` (Discord with 8 native capabilities + Gateway inbound + attachment downloading + rich embed support), `chat-slack` (Slack with 9 native capabilities — most capable implementation; batch user fetch for members, full ts-precision message history). Shared HTTP clients: `slack-bot` (Slack Web API — 14 methods: messaging, channel listing, reactions, presence, members, users, channel management, member management, message history), `discord` (Discord Bot REST API v10 + Gateway WebSocket + CDN attachment download with SSRF defense + rich embed serialization). MCP tools: `send_slack`, `send_teams`, `send_sms`, `send_whatsapp`, `send_email`, `send_chat`, `list_channels`, `list_chat_channels`. Includes a profile-gated demo chat service (`chat-demo`, `-Pdemo`) with SQLite persistence, REST/WebSocket endpoints, and a pre-populated seed database.
+Outbound and inbound message connector library for the casehubio platform. Provides a `Connector` CDI SPI (outbound) and `InboundConnector`/`WebhookInboundConnector` SPIs (inbound) with built-in implementations for Slack, Teams, Twilio SMS, WhatsApp, and email. Also provides a `ChatPlatform` SPI (`chat-spi`) for structured interaction with chat systems (channels, threads, reactions, presence, members, channel management, member management, message history) with graceful degradation across platforms. ChatPlatform model includes `RichCard` for platform-agnostic rich content and `Channel` with `memberCount`. ChatPlatform implementations: `chat-ref` (in-memory reference), `chat-irc` (IRC with 3 native capabilities), `chat-discord` (Discord with 8 native capabilities + Gateway inbound + attachment downloading + rich embed support), `chat-slack` (Slack with 9 native capabilities — most capable implementation; batch user fetch for members, full ts-precision message history). Shared HTTP clients: `slack-bot` (Slack Web API — 14 methods: messaging, channel listing, reactions, presence, members, users, channel management, member management, message history), `discord` (Discord Bot REST API v10 + Gateway WebSocket + CDN attachment download with SSRF defense + rich embed serialization). MCP tools: `send_slack`, `send_teams`, `send_sms`, `send_whatsapp`, `send_email`, `send_chat`, `list_channels`, `list_chat_channels`. Includes a profile-gated demo chat service (`chat-demo`, `-Pdemo`) with SQLite persistence, REST/WebSocket endpoints, a pre-populated seed database, and an optional casehub-pages Quinoa frontend (`-Pdemo -Pui`) with three-column layout, dockable panels, dark mode, and real-time WebSocket data.
 
 **This is the canonical connector infrastructure for the platform.** Any casehubio repo that needs to send outbound messages or receive inbound webhook messages must use these SPIs, not implement its own connector.
 
@@ -128,6 +128,11 @@ JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install
 **With demo module:**
 ```bash
 JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install -Pdemo
+```
+
+**With demo module + UI:**
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install -Pdemo -Pui
 ```
 
 **Use `mvn` not `./mvnw`** — maven wrapper not configured on this machine.

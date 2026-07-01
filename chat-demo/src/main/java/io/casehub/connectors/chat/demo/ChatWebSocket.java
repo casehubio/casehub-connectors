@@ -2,8 +2,10 @@ package io.casehub.connectors.chat.demo;
 
 import jakarta.inject.Inject;
 
+import io.quarkus.logging.Log;
 import io.quarkus.websockets.next.OnClose;
 import io.quarkus.websockets.next.OnOpen;
+import io.quarkus.websockets.next.OnTextMessage;
 import io.quarkus.websockets.next.WebSocket;
 import io.quarkus.websockets.next.WebSocketConnection;
 
@@ -17,6 +19,11 @@ public class ChatWebSocket {
     public String onOpen(final WebSocketConnection connection) {
         broadcaster.addConnection(connection);
         return broadcaster.buildSnapshot();
+    }
+
+    @OnTextMessage
+    public void onMessage(final String message) {
+        Log.debugf("WebSocket client message (ignored): %s", message);
     }
 
     @OnClose

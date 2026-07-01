@@ -88,6 +88,12 @@ and casehub-pages UI. Profile-gated — not included in the default build.</desc
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.glassfish.tyrus.bundles</groupId>
+      <artifactId>tyrus-standalone-client</artifactId>
+      <version>2.2.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -119,5 +125,18 @@ and casehub-pages UI. Profile-gated — not included in the default build.</desc
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>ui</id>
+      <dependencies>
+        <dependency>
+          <groupId>io.quarkiverse.quinoa</groupId>
+          <artifactId>quarkus-quinoa</artifactId>
+          <version>2.8.3</version>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 
 </project>

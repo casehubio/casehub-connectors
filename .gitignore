@@ -4,3 +4,4 @@ target/
 wksp
 
 .idea/
+.quinoa/
