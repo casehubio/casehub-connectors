@@ -189,12 +189,21 @@ class DiscordChatPlatformTest {
                                   {"id": "ch-2", "name": "announcements", "topic": "News", "type": 5}
                                 ]
                                 """)));
+        wireMock.stubFor(get(urlEqualTo("/guilds/test-guild-123?with_counts=true"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"id": "test-guild-123", "name": "Test Guild", "approximate_member_count": 42}
+                                """)));
 
         List<Channel> channels = platform.discovery().listChannels();
 
         assertThat(channels).hasSize(2);
         assertThat(channels.stream().map(c -> c.name())).contains("general", "announcements");
         assertThat(channels.stream().map(c -> c.topic())).contains("Welcome", "News");
+        assertThat(channels.get(0).memberCount()).isEqualTo(42);
+        assertThat(channels.get(1).memberCount()).isEqualTo(42);
     }
 
     @Test
@@ -761,6 +770,74 @@ class DiscordChatPlatformTest {
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0).content().attachments()).isEmpty();
         assertThat(messages.get(0).content().text()).isEqualTo("Bad file");
+    }
+
+    @Test
+    void sendMessageWithRichCard() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        final var card = RichCard.builder()
+                .title("Deploy")
+                .description("3 services")
+                .color(0x00FF00)
+                .fields(List.of(new RichCard.Field("env", "prod", true)))
+                .footer("bot v2")
+                .author("CI")
+                .build();
+
+        final var content = new ChatContent("fallback", null, List.of(), List.of(card));
+        final var result = platform.messaging().send(new ChatChannelRef("ch1"), content);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.embeds[0].title", equalTo("Deploy")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].description", equalTo("3 services")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].color", equalTo("65280")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].footer.text", equalTo("bot v2")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].author.name", equalTo("CI")))
+                .withRequestBody(matchingJsonPath("$.embeds[0].fields[0].name", equalTo("env"))));
+    }
+
+    @Test
+    void sendMessageRejectsOversizedTitle() {
+        final var card = RichCard.builder()
+                .title("x".repeat(257))
+                .build();
+        final var content = new ChatContent("fallback", null, List.of(), List.of(card));
+        final var result = platform.messaging().send(new ChatChannelRef("ch1"), content);
+
+        assertThat(result.ok()).isFalse();
+        assertThat(result.error()).contains("256");
+    }
+
+    @Test
+    void sendMessageWithoutCardsUsesTextOnly() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg1\",\"channel_id\":\"ch1\"}")));
+
+        final var content = new ChatContent("just text");
+        final var result = platform.messaging().send(new ChatChannelRef("ch1"), content);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(not(matchingJsonPath("$.embeds"))));
+    }
+
+    @Test
+    void replyWithRichCard() {
+        wireMock.stubFor(post(urlEqualTo("/channels/ch1/messages"))
+                .willReturn(okJson("{\"id\":\"msg2\",\"channel_id\":\"ch1\"}")));
+
+        final var card = RichCard.builder().title("Update").build();
+        final var content = new ChatContent("fallback", null, List.of(), List.of(card));
+        final var parent = new ChatMessageRef(new ChatChannelRef("ch1"), "msg1");
+        final var result = platform.threading().reply(parent, content);
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(postRequestedFor(urlEqualTo("/channels/ch1/messages"))
+                .withRequestBody(matchingJsonPath("$.embeds[0].title", equalTo("Update")))
+                .withRequestBody(matchingJsonPath("$.message_reference.message_id", equalTo("msg1"))));
     }
 
     private static class RecordingSink implements InboundMessageSink {

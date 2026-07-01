@@ -156,12 +156,21 @@ public class DiscordChatPlatform implements ChatPlatform {
     // Messaging implementation
     private SendResult sendMessage(final ChatChannelRef channel, final ChatContent content) {
         final String messageContent = extractContent(content);
-
-        if (messageContent.length() > MAX_CONTENT_LENGTH) {
-            return SendResult.failure("Content exceeds Discord's 2000-character limit");
+        final List<DiscordEmbed> embeds;
+        if (!content.cards().isEmpty()) {
+            final SendResult validation = validateEmbeds(content.cards());
+            if (validation != null) return validation;
+            embeds = toEmbeds(content.cards());
+        } else {
+            embeds = List.of();
+            if (messageContent.length() > MAX_CONTENT_LENGTH) {
+                return SendResult.failure("Content exceeds Discord's 2000-character limit");
+            }
         }
 
-        final PostResult result = client.sendMessage(token, channel.id(), messageContent);
+        final PostResult result = embeds.isEmpty()
+                ? client.sendMessage(token, channel.id(), messageContent)
+                : client.sendMessage(token, channel.id(), messageContent, embeds);
 
         if (!result.ok()) {
             return SendResult.failure(result.error());
@@ -175,16 +184,21 @@ public class DiscordChatPlatform implements ChatPlatform {
     // Threading implementation
     private SendResult sendReply(final ChatMessageRef parent, final ChatContent content) {
         final String messageContent = extractContent(content);
-
-        if (messageContent.length() > MAX_CONTENT_LENGTH) {
-            return SendResult.failure("Content exceeds Discord's 2000-character limit");
+        final List<DiscordEmbed> embeds;
+        if (!content.cards().isEmpty()) {
+            final SendResult validation = validateEmbeds(content.cards());
+            if (validation != null) return validation;
+            embeds = toEmbeds(content.cards());
+        } else {
+            embeds = List.of();
+            if (messageContent.length() > MAX_CONTENT_LENGTH) {
+                return SendResult.failure("Content exceeds Discord's 2000-character limit");
+            }
         }
 
-        final PostResult result = client.sendReply(
-                token,
-                parent.channel().id(),
-                messageContent,
-                parent.messageId());
+        final PostResult result = embeds.isEmpty()
+                ? client.sendReply(token, parent.channel().id(), messageContent, parent.messageId())
+                : client.sendReply(token, parent.channel().id(), messageContent, parent.messageId(), embeds);
 
         if (!result.ok()) {
             return SendResult.failure(result.error());
@@ -198,10 +212,12 @@ public class DiscordChatPlatform implements ChatPlatform {
     // Discovery implementation
     private List<Channel> listChannels() {
         final List<DiscordChannel> channels = client.listGuildChannels(token);
+        final DiscordGuild guild = client.getGuild(token, true);
+        final Integer memberCount = guild != null ? guild.approximateMemberCount() : null;
 
         return channels.stream()
                 .filter(ch -> isTextChannel(ch.type()))
-                .map(this::toChannel)
+                .map(ch -> toChannel(ch, memberCount))
                 .toList();
     }
 
@@ -211,13 +227,14 @@ public class DiscordChatPlatform implements ChatPlatform {
         return type == 0 || type == 5 || type == 10 || type == 11 || type == 12;
     }
 
-    private Channel toChannel(final DiscordChannel dc) {
+    private Channel toChannel(final DiscordChannel dc, final Integer memberCount) {
         return new Channel(
                 new ChatChannelRef(dc.id()),
                 dc.name(),
                 dc.topic(),
                 null, // Discord has no separate description
-                isPrivateChannel(dc));
+                isPrivateChannel(dc),
+                memberCount);
     }
 
     private boolean isPrivateChannel(final DiscordChannel channel) {
@@ -288,7 +305,7 @@ public class DiscordChatPlatform implements ChatPlatform {
             if (dc == null) {
                 throw new IllegalStateException("Channel creation failed");
             }
-            return toChannel(dc);
+            return toChannel(dc, null);
         }
 
         @Override
@@ -297,7 +314,7 @@ public class DiscordChatPlatform implements ChatPlatform {
             if (dc == null) {
                 return Optional.empty();
             }
-            return Optional.of(toChannel(dc));
+            return Optional.of(toChannel(dc, null));
         }
     }
 
@@ -340,6 +357,54 @@ public class DiscordChatPlatform implements ChatPlatform {
                 new MemberRef(dm.author().id()),
                 new ChatContent(dm.content(), null, attachments, List.of()),
                 dm.timestamp());
+    }
+
+    private List<DiscordEmbed> toEmbeds(final List<RichCard> cards) {
+        return cards.stream().map(this::toEmbed).toList();
+    }
+
+    private DiscordEmbed toEmbed(final RichCard card) {
+        final List<DiscordEmbed.Field> fields = card.fields().stream()
+                .map(f -> new DiscordEmbed.Field(f.name(), f.value(), f.inline()))
+                .toList();
+        final DiscordEmbed.Footer footer = card.footer() != null
+                ? new DiscordEmbed.Footer(card.footer()) : null;
+        final DiscordEmbed.Author author = card.author() != null
+                ? new DiscordEmbed.Author(card.author()) : null;
+        return new DiscordEmbed(card.title(), card.description(), card.url(), card.color(),
+                fields, card.thumbnailUrl(), card.imageUrl(), footer, author);
+    }
+
+    private SendResult validateEmbeds(final List<RichCard> cards) {
+        if (cards.size() > 10) {
+            return SendResult.failure("Discord allows at most 10 embeds per message");
+        }
+        long totalChars = 0;
+        for (final RichCard card : cards) {
+            if (card.title() != null && card.title().length() > 256)
+                return SendResult.failure("Embed title exceeds 256 characters");
+            if (card.description() != null && card.description().length() > 4096)
+                return SendResult.failure("Embed description exceeds 4096 characters");
+            if (card.footer() != null && card.footer().length() > 2048)
+                return SendResult.failure("Embed footer exceeds 2048 characters");
+            if (card.author() != null && card.author().length() > 256)
+                return SendResult.failure("Embed author exceeds 256 characters");
+            if (card.fields().size() > 25)
+                return SendResult.failure("Embed exceeds 25 fields");
+            if (card.url() != null && card.title() == null)
+                return SendResult.failure("Embed url requires title");
+            totalChars += (card.title() != null ? card.title().length() : 0)
+                    + (card.description() != null ? card.description().length() : 0)
+                    + (card.footer() != null ? card.footer().length() : 0)
+                    + (card.author() != null ? card.author().length() : 0);
+            for (final RichCard.Field f : card.fields()) {
+                totalChars += f.name().length() + f.value().length();
+            }
+        }
+        if (totalChars > 6000) {
+            return SendResult.failure("Total embed content exceeds 6000 characters");
+        }
+        return null;
     }
 
     private String extractContent(final ChatContent content) {
