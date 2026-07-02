@@ -523,6 +523,20 @@ public class SlackBotClient {
         }
     }
 
+    /**
+     * Archives a conversation (Slack does not support true deletion).
+     *
+     * @param token     bot token ({@code xoxb-…})
+     * @param channelId Slack channel ID
+     * @return result with ok/error
+     */
+    public ApiResult archiveConversation(final String token, final String channelId) {
+        final String json = Json.createObjectBuilder()
+                .add("channel", channelId)
+                .build().toString();
+        return sendSimpleRequest(token, "/api/conversations.archive", json);
+    }
+
     private ApiResult sendSimpleRequest(final String token, final String path, final String json) {
         try {
             final HttpRequest request = HttpRequest.newBuilder()

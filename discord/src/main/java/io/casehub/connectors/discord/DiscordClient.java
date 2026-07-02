@@ -339,6 +339,32 @@ public class DiscordClient {
     }
 
     /**
+     * Deletes a channel.
+     *
+     * @param token     bot token
+     * @param channelId Discord channel ID
+     */
+    public void deleteChannel(final String token, final String channelId) {
+        try {
+            final HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(apiBaseUrl + "/channels/" + channelId))
+                    .header("Authorization", "Bot " + token)
+                    .timeout(REQUEST_TIMEOUT)
+                    .DELETE()
+                    .build();
+
+            final HttpResponse<String> response =
+                    HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200 && response.statusCode() != 204) {
+                LOG.warning("DiscordClient: deleteChannel HTTP " + response.statusCode());
+            }
+        } catch (final Exception e) {
+            LOG.warning("DiscordClient: deleteChannel error — " + e.getMessage());
+        }
+    }
+
+    /**
      * Adds a reaction to a message.
      *
      * @param token     bot token

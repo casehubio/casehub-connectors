@@ -16,6 +16,7 @@ import io.casehub.connectors.chat.model.ReceivedMessage;
 public interface ChatBackend {
 
     Channel createChannel(String name, String topic, String description, boolean isPrivate);
+    void deleteChannel(String channelId);
     Optional<Channel> findChannel(String channelId);
     List<Channel> listChannels();
 

@@ -50,6 +50,14 @@ public class ChatResource {
         return Response.ok(channel).build();
     }
 
+    @DELETE
+    @Path("/channels/{channelId}")
+    public Response deleteChannel(@PathParam("channelId") final String channelId) {
+        chatPlatform.channelManagement().delete(channelId);
+        broadcaster.broadcastChannelRemove(channelId);
+        return Response.noContent().build();
+    }
+
     @GET
     @Path("/channels")
     public List<Channel> listChannels() {
@@ -139,6 +147,7 @@ public class ChatResource {
                                    @PathParam("emoji") final String emoji) {
         chatPlatform.reactions().remove(
                 new ChatMessageRef(new ChatChannelRef(channelId), messageId), emoji);
+        broadcaster.broadcastReactionRemove(messageId, emoji);
         return Response.ok().build();
     }
 

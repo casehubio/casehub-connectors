@@ -104,6 +104,9 @@ public class RefChatPlatform implements ChatPlatform {
                                             final String description, final boolean isPrivate) {
                 return backend.createChannel(name, topic, description, isPrivate);
             }
+            @Override public void delete(final String channelId) {
+                backend.deleteChannel(channelId);
+            }
             @Override public Optional<Channel> find(final String channelId) {
                 return backend.findChannel(channelId);
             }

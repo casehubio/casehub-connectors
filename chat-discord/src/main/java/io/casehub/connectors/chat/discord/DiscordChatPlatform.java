@@ -309,6 +309,11 @@ public class DiscordChatPlatform implements ChatPlatform {
         }
 
         @Override
+        public void delete(final String channelId) {
+            client.deleteChannel(token, channelId);
+        }
+
+        @Override
         public Optional<Channel> find(final String channelId) {
             final DiscordChannel dc = client.getChannel(token, channelId);
             if (dc == null) {

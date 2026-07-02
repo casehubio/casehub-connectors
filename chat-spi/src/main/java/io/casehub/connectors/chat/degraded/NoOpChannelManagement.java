@@ -12,6 +12,11 @@ public class NoOpChannelManagement implements ChannelManagement {
     }
 
     @Override
+    public void delete(final String channelId) {
+        throw new UnsupportedOperationException("Channel deletion not supported by this platform");
+    }
+
+    @Override
     public Optional<Channel> find(final String channelId) {
         return Optional.empty();
     }

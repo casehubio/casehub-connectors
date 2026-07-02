@@ -40,6 +40,16 @@ public class InMemoryChatBackend implements ChatBackend {
     }
 
     @Override
+    public void deleteChannel(final String channelId) {
+        channels.remove(channelId);
+        final List<ReceivedMessage> msgs = messagesByChannel.remove(channelId);
+        if (msgs != null) {
+            msgs.forEach(m -> reactionsByMessage.remove(m.messageRef().messageId()));
+        }
+        membersByChannel.remove(channelId);
+    }
+
+    @Override
     public Optional<Channel> findChannel(final String channelId) {
         return Optional.ofNullable(channels.get(channelId));
     }

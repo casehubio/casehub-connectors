@@ -179,4 +179,33 @@ public abstract class ChatBackendContract {
     void membersReturnsEmptyForUnknownChannel() {
         assertThat(backend.members(new ChatChannelRef("unknown"))).isEmpty();
     }
+
+    @Test
+    void deleteChannelCascadesAllData() {
+        final ReceivedMessage msg = backend.storeMessage(
+                "ref", channel.ref(), new ChatContent("hello"),
+                new MemberRef("user1"), null);
+        backend.addReaction(msg.messageRef(), "thumbsup");
+        backend.addMember(channel.ref(), new Member(new MemberRef("user1"), "User One"));
+
+        backend.deleteChannel(channel.ref().id());
+
+        assertThat(backend.findChannel(channel.ref().id())).isEmpty();
+        assertThat(backend.listChannels()).isEmpty();
+        assertThat(backend.messages(channel.ref(), Instant.EPOCH)).isEmpty();
+        assertThat(backend.reactions(msg.messageRef())).isEmpty();
+        assertThat(backend.members(channel.ref())).isEmpty();
+    }
+
+    @Test
+    void deleteChannelDoesNotAffectOtherChannels() {
+        final Channel other = backend.createChannel("random", "Random", null, false);
+        backend.storeMessage("ref", other.ref(), new ChatContent("keep me"),
+                new MemberRef("user1"), null);
+
+        backend.deleteChannel(channel.ref().id());
+
+        assertThat(backend.findChannel(other.ref().id())).isPresent();
+        assertThat(backend.messages(other.ref(), Instant.EPOCH)).hasSize(1);
+    }
 }

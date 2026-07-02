@@ -103,6 +103,16 @@ public class ChatWebSocketBroadcaster {
             }
         }
 
+        // Reactions dataset
+        final var reactions = new java.util.ArrayList<List<Object>>();
+        for (final Channel ch : channels) {
+            for (final ReceivedMessage msg : chatPlatform.messageHistory().messages(ch.ref(), java.time.Instant.EPOCH)) {
+                for (final String emoji : chatPlatform.reactions().list(msg.messageRef())) {
+                    reactions.add(List.of(msg.messageRef().messageId(), emoji));
+                }
+            }
+        }
+
         // Presence dataset - collect unique members across all channels
         final var uniqueMembers = new LinkedHashSet<MemberRef>();
         for (final Channel ch : channels) {
@@ -125,7 +135,9 @@ public class ChatWebSocketBroadcaster {
                 Map.of("dataset", "members", "op", "snapshot", "seq", String.valueOf(seq.incrementAndGet()),
                         "columns", MEMBER_COLUMNS, "rows", members),
                 Map.of("dataset", "presence", "op", "snapshot", "seq", String.valueOf(seq.incrementAndGet()),
-                        "columns", PRESENCE_COLUMNS, "rows", presenceRows)));
+                        "columns", PRESENCE_COLUMNS, "rows", presenceRows),
+                Map.of("dataset", "reactions", "op", "snapshot", "seq", String.valueOf(seq.incrementAndGet()),
+                        "columns", REACTION_COLUMNS, "rows", reactions)));
     }
 
     void broadcastMessageAppend(final ReceivedMessage msg) {
@@ -187,6 +199,24 @@ public class ChatWebSocketBroadcaster {
                 "seq", String.valueOf(seq.incrementAndGet()),
                 "columns", REACTION_COLUMNS,
                 "rows", List.of(List.of(messageId, emoji))));
+    }
+
+    void broadcastReactionRemove(final String messageId, final String emoji) {
+        broadcast(Map.of(
+                "dataset", "reactions",
+                "op", "remove",
+                "seq", String.valueOf(seq.incrementAndGet()),
+                "columns", REACTION_COLUMNS,
+                "key", messageId + ":" + emoji));
+    }
+
+    void broadcastChannelRemove(final String channelId) {
+        broadcast(Map.of(
+                "dataset", "channels",
+                "op", "remove",
+                "seq", String.valueOf(seq.incrementAndGet()),
+                "columns", CHANNEL_COLUMNS,
+                "key", channelId));
     }
 
     private void broadcast(final Object event) {

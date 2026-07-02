@@ -159,6 +159,36 @@ class ChatResourceTest {
     }
 
     @Test
+    void deleteChannelCascadesAndReturns200() {
+        final String messageId = given()
+                .contentType(ContentType.JSON)
+                .body(Map.of("text", "doomed"))
+                .post("/api/channels/{id}/messages", channelId)
+                .then().statusCode(200)
+                .extract().path("messageId");
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(Map.of("emoji", "thumbsup"))
+                .post("/api/channels/{channelId}/messages/{messageId}/reactions", channelId, messageId)
+                .then().statusCode(200);
+
+        given()
+                .delete("/api/channels/{id}", channelId)
+                .then().statusCode(204);
+
+        given()
+                .get("/api/channels/{id}/messages", channelId)
+                .then().statusCode(200)
+                .body("size()", is(0));
+
+        given()
+                .get("/api/channels/{channelId}/messages/{messageId}/reactions", channelId, messageId)
+                .then().statusCode(200)
+                .body("size()", is(0));
+    }
+
+    @Test
     void setAndGetPresence() {
         given()
                 .contentType(ContentType.JSON)

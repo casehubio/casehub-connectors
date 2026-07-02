@@ -286,6 +286,14 @@ public class SlackChatPlatform implements ChatPlatform {
         }
 
         @Override
+        public void delete(final String channelId) {
+            final SlackBotClient.ApiResult result = client.archiveConversation(token, channelId);
+            if (!result.ok()) {
+                throw new IllegalStateException("Channel archive failed: " + result.error());
+            }
+        }
+
+        @Override
         public Optional<Channel> find(final String channelId) {
             final ConversationResult result = client.getConversationInfo(token, channelId);
             if (!result.ok()) {

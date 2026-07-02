@@ -167,6 +167,44 @@ public class SqliteChatBackend implements ChatBackend {
     }
 
     @Override
+    public void deleteChannel(final String channelId) {
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM reactions WHERE message_id IN " +
+                        "(SELECT id FROM messages WHERE channel_id = ?)")) {
+                    ps.setString(1, channelId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM messages WHERE channel_id = ?")) {
+                    ps.setString(1, channelId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM members WHERE channel_id = ?")) {
+                    ps.setString(1, channelId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM channels WHERE id = ?")) {
+                    ps.setString(1, channelId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            } catch (final SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (final SQLException e) {
+            throw new RuntimeException("Failed to delete channel", e);
+        }
+    }
+
+    @Override
     public Optional<Channel> findChannel(final String channelId) {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(
