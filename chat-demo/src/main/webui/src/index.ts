@@ -1,5 +1,6 @@
 import { loadSite, registerPanel } from "@casehubio/pages-runtime";
 import { columns, split, dockBar, hostPanel, withId } from "@casehubio/pages-ui";
+import { ResponsiveController } from "./responsive.js";
 
 import "./panels/channel-sidebar.js";
 import "./panels/message-list.js";
@@ -14,18 +15,18 @@ registerPanel("members", "chat-member-list");
 const WS_URL = `ws://${window.location.host}/ws/chat`;
 
 const chatApp = columns([0, 1],
-  [dockBar("vertical", [
+  [withId("dock", dockBar("vertical", [
     { icon: "\u{1F4AC}", label: "Channels", panelId: "channel-panel", defaultOpen: true },
     { icon: "\u{1F465}", label: "Members", panelId: "member-panel", defaultOpen: true },
-  ])],
-  [split("horizontal", [
+  ]))],
+  [withId("main-split", split("horizontal", [
     withId("channel-panel", hostPanel("channels")),
-    split("vertical", [
+    withId("chat-area", split("vertical", [
       hostPanel("messages"),
       hostPanel("input"),
-    ], { ratio: [90, 10] }),
+    ], { ratio: [90, 10] })),
     withId("member-panel", hostPanel("members")),
-  ], { ratio: [20, 60, 20] })],
+  ], { ratio: [20, 60, 20] }))],
 );
 
 const container = document.getElementById("app");
@@ -36,6 +37,7 @@ if (container) {
     },
   }).then((site) => {
     site.setTheme("dark");
+    new ResponsiveController(container);
 
     // Open WebSocket and relay messages to all panels as DOM events
     const ws = new WebSocket(WS_URL);

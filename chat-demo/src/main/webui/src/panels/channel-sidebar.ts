@@ -251,7 +251,9 @@ class ChatChannelSidebar extends HTMLElement {
       }
     } else if (msg.op === "append" && msg.rows) {
       for (const r of msg.rows) {
-        this.channels.push({ id: r[0], name: r[1], topic: r[2] });
+        if (!this.channels.some((ch) => ch.id === r[0])) {
+          this.channels.push({ id: r[0], name: r[1], topic: r[2] });
+        }
       }
       this.render();
     } else if (msg.op === "remove" && msg.key) {
@@ -275,7 +277,7 @@ class ChatChannelSidebar extends HTMLElement {
     this.dispatchEvent(new CustomEvent("pages-event", {
       bubbles: true,
       composed: true,
-      detail: { topic: "channel-selected", payload: { channelId: id } },
+      detail: { topic: "channel-selected", payload: { channelId: id, channelName: this.channels.find((ch) => ch.id === id)?.name ?? "" } },
     }));
   }
 
@@ -315,8 +317,12 @@ class ChatChannelSidebar extends HTMLElement {
       });
       if (resp.ok) {
         const channel = await resp.json();
+        const ref = channel.ref;
+        if (!this.channels.some((ch) => ch.id === ref.id)) {
+          this.channels.push({ id: ref.id, name: ref.name ?? name, topic: ref.topic ?? "" });
+        }
         this.closeCreateModal();
-        queueMicrotask(() => this.selectChannel(channel.ref.id));
+        queueMicrotask(() => this.selectChannel(ref.id));
       }
     } catch (err) {
       console.error("Failed to create channel:", err);

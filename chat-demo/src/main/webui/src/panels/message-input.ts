@@ -46,7 +46,7 @@ const STYLES = `
   .reply-cancel:hover {
     color: var(--pages-text, #e0e0e0);
   }
-  input {
+  textarea {
     width: 100%;
     padding: 10px 16px;
     font-size: 14px;
@@ -58,15 +58,21 @@ const STYLES = `
     outline: none;
     box-sizing: border-box;
     transition: border-color 0.2s, opacity 0.2s;
+    resize: none;
+    overflow-y: hidden;
+    min-height: 42px;
+    max-height: 200px;
+    line-height: 1.4;
+    rows: 1;
   }
-  input:focus {
+  textarea:focus {
     border-color: var(--pages-accent, #7c8cf8);
   }
-  input:disabled {
+  textarea:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  input.error {
+  textarea.error {
     border-color: #e74c3c;
   }
 `;
@@ -76,7 +82,7 @@ class ChatMessageInput extends HTMLElement {
   private currentChannelId = "";
   private replyToMessageId: string | null = null;
   private replyToSenderName: string | null = null;
-  private input: HTMLInputElement | null = null;
+  private textarea: HTMLTextAreaElement | null = null;
   private errorTimer: number | null = null;
 
   constructor() {
@@ -87,7 +93,7 @@ class ChatMessageInput extends HTMLElement {
   connectedCallback(): void {
     document.addEventListener("pages-event", this.onEvent);
     this.render();
-    this.bindInput();
+    this.bindTextarea();
   }
 
   disconnectedCallback(): void {
@@ -95,10 +101,19 @@ class ChatMessageInput extends HTMLElement {
     if (this.errorTimer !== null) clearTimeout(this.errorTimer);
   }
 
-  private bindInput(): void {
-    this.input = this.shadow.querySelector("input");
-    this.input?.addEventListener("keydown", this.onKeydown);
+  private bindTextarea(): void {
+    this.textarea = this.shadow.querySelector("textarea");
+    this.textarea?.addEventListener("keydown", this.onKeydown);
+    this.textarea?.addEventListener("input", this.onAutoResize);
   }
+
+  private onAutoResize = (): void => {
+    const ta = this.textarea;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+    ta.style.overflowY = ta.scrollHeight > 200 ? "auto" : "hidden";
+  };
 
   private onEvent = (e: Event): void => {
     const { topic, payload } = (e as CustomEvent).detail;
@@ -116,8 +131,8 @@ class ChatMessageInput extends HTMLElement {
       this.replyToMessageId = messageId;
       this.replyToSenderName = senderName;
       this.render();
-      this.bindInput();
-      this.input?.focus();
+      this.bindTextarea();
+      this.textarea?.focus();
     }
   };
 
@@ -125,18 +140,19 @@ class ChatMessageInput extends HTMLElement {
     this.replyToMessageId = null;
     this.replyToSenderName = null;
     this.render();
-    this.bindInput();
+    this.bindTextarea();
   }
 
   private onKeydown = async (e: KeyboardEvent): Promise<void> => {
     if (e.key !== "Enter") return;
+    if (e.shiftKey) return;
     e.preventDefault();
 
-    const input = e.target as HTMLInputElement;
-    const text = input.value.trim();
+    const ta = e.target as HTMLTextAreaElement;
+    const text = ta.value.trim();
     if (!text || !this.currentChannelId) return;
 
-    input.disabled = true;
+    ta.disabled = true;
 
     try {
       let url: string;
@@ -154,16 +170,18 @@ class ChatMessageInput extends HTMLElement {
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      input.value = "";
-      input.disabled = false;
+      ta.value = "";
+      ta.disabled = false;
+      ta.style.height = "auto";
+      ta.style.overflowY = "hidden";
       if (this.replyToMessageId) this.clearReplyState();
     } catch (err) {
-      input.disabled = false;
-      input.classList.add("error");
+      ta.disabled = false;
+      ta.classList.add("error");
 
       if (this.errorTimer !== null) clearTimeout(this.errorTimer);
       this.errorTimer = window.setTimeout(() => {
-        input.classList.remove("error");
+        ta.classList.remove("error");
         this.errorTimer = null;
       }, 2000);
 
@@ -172,13 +190,13 @@ class ChatMessageInput extends HTMLElement {
   };
 
   private updateInputState(): void {
-    if (!this.input) return;
+    if (!this.textarea) return;
     if (this.currentChannelId) {
-      this.input.disabled = false;
-      this.input.placeholder = "Type a message...";
+      this.textarea.disabled = false;
+      this.textarea.placeholder = "Type a message...";
     } else {
-      this.input.disabled = true;
-      this.input.placeholder = "Select a channel first";
+      this.textarea.disabled = true;
+      this.textarea.placeholder = "Select a channel first";
     }
   }
 
@@ -194,7 +212,7 @@ class ChatMessageInput extends HTMLElement {
       <style>${STYLES}</style>
       <div class="input-wrapper">
         ${replyBanner}
-        <input type="text" placeholder="${this.currentChannelId ? "Type a message..." : "Select a channel first"}" ${this.currentChannelId ? "" : "disabled"} />
+        <textarea rows="1" placeholder="${this.currentChannelId ? "Type a message..." : "Select a channel first"}" ${this.currentChannelId ? "" : "disabled"}></textarea>
       </div>
     `;
 
