@@ -38,6 +38,11 @@ and casehub-pages UI. Profile-gated — not included in the default build.</desc
       <artifactId>casehub-connectors-core</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-pages-auth</artifactId>
+      <version>0.1-SNAPSHOT</version>
+    </dependency>
 
     <!-- Quarkus -->
     <dependency>

@@ -33,6 +33,21 @@ class ChatWebSocketTest {
     ObjectMapper objectMapper;
 
     @Test
+    void connectWithoutTokenIsRejected() throws Exception {
+        final var container = ContainerProvider.getWebSocketContainer();
+        final var wsUriConverted = new URI(wsUri.toString().replace("http://", "ws://"));
+        try {
+            container.connectToServer(new Endpoint() {
+                @Override
+                public void onOpen(final Session session, final EndpointConfig config) {}
+            }, ClientEndpointConfig.Builder.create().build(), wsUriConverted);
+            org.junit.jupiter.api.Assertions.fail("Expected connection to be rejected");
+        } catch (final Exception e) {
+            // Expected — server rejects upgrade without valid JWT
+        }
+    }
+
+    @Test
     void snapshotContainsFourDatasetsWithCorrectStructure() throws Exception {
         final var future = new CompletableFuture<String>();
         try (Session session = connectAndCapture(future)) {
@@ -156,8 +171,10 @@ class ChatWebSocketTest {
             final long snapshotSeq = Long.parseLong((String) messagesSnapshot.get("seq"));
 
             // Post a new message via REST
+            final String token = obtainToken("rest-user");
             RestAssured.given()
                     .contentType("application/json")
+                    .header("Authorization", "Bearer " + token)
                     .body(Map.of("text", "append test message"))
                     .post("/api/channels/general/messages")
                     .then()
@@ -253,9 +270,19 @@ class ChatWebSocketTest {
         }
     }
 
+    private String obtainToken(final String name) {
+        return RestAssured.given()
+                .contentType("application/json")
+                .body(Map.of("name", name))
+                .post("/dev/auth/login")
+                .then().statusCode(200)
+                .extract().path("token");
+    }
+
     private Session connectAndCapture(final CompletableFuture<String> future) throws Exception {
+        final String token = obtainToken("ws-user");
         final var container = ContainerProvider.getWebSocketContainer();
-        final var wsUriConverted = new URI(wsUri.toString().replace("http://", "ws://"));
+        final var wsUriConverted = new URI(wsUri.toString().replace("http://", "ws://") + "?token=" + token);
         return container.connectToServer(new Endpoint() {
             @Override
             public void onOpen(final Session session, final EndpointConfig config) {
@@ -272,8 +299,9 @@ class ChatWebSocketTest {
     private Session connectAndCaptureMultiple(final List<String> messages,
                                               final CompletableFuture<Map<String, Object>> firstMessageFuture)
             throws Exception {
+        final String token = obtainToken("ws-user");
         final var container = ContainerProvider.getWebSocketContainer();
-        final var wsUriConverted = new URI(wsUri.toString().replace("http://", "ws://"));
+        final var wsUriConverted = new URI(wsUri.toString().replace("http://", "ws://") + "?token=" + token);
         return container.connectToServer(new Endpoint() {
             @Override
             public void onOpen(final Session session, final EndpointConfig config) {

@@ -1,3 +1,5 @@
+import { authenticatedFetch } from "../auth.js";
+
 const STYLES = `
   :host {
     display: block;
@@ -92,12 +94,14 @@ class ChatMessageInput extends HTMLElement {
 
   connectedCallback(): void {
     document.addEventListener("pages-event", this.onEvent);
+    document.addEventListener("pages-auth-success", this.onAuthChange);
     this.render();
     this.bindTextarea();
   }
 
   disconnectedCallback(): void {
     document.removeEventListener("pages-event", this.onEvent);
+    document.removeEventListener("pages-auth-success", this.onAuthChange);
     if (this.errorTimer !== null) clearTimeout(this.errorTimer);
   }
 
@@ -162,7 +166,7 @@ class ChatMessageInput extends HTMLElement {
         url = `/api/channels/${this.currentChannelId}/messages`;
       }
 
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -200,7 +204,14 @@ class ChatMessageInput extends HTMLElement {
     }
   }
 
+  private onAuthChange = (): void => {
+    this.render();
+    this.bindTextarea();
+  };
+
   private render(): void {
+    const identityDisplay = `<pages-identity backend-url=""></pages-identity>`;
+
     const replyBanner = this.replyToMessageId && this.replyToSenderName
       ? `<div class="reply-banner">
            <span class="reply-banner-text">Replying to <span class="reply-banner-sender">${this.escapeHtml(this.replyToSenderName)}</span></span>
@@ -211,6 +222,7 @@ class ChatMessageInput extends HTMLElement {
     this.shadow.innerHTML = `
       <style>${STYLES}</style>
       <div class="input-wrapper">
+        ${identityDisplay}
         ${replyBanner}
         <textarea rows="1" placeholder="${this.currentChannelId ? "Type a message..." : "Select a channel first"}" ${this.currentChannelId ? "" : "disabled"}></textarea>
       </div>

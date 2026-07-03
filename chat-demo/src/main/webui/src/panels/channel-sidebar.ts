@@ -1,3 +1,5 @@
+import { authenticatedFetch } from "../auth.js";
+
 const STYLES = `
   :host {
     display: flex;
@@ -305,7 +307,7 @@ class ChatChannelSidebar extends HTMLElement {
     if (!name) return;
 
     try {
-      const resp = await fetch("/api/channels", {
+      const resp = await authenticatedFetch("/api/channels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -345,7 +347,7 @@ class ChatChannelSidebar extends HTMLElement {
     this.deleteTarget = null;
 
     try {
-      await fetch(`/api/channels/${id}`, { method: "DELETE" });
+      await authenticatedFetch(`/api/channels/${id}`, { method: "DELETE" });
     } catch (err) {
       console.error("Failed to delete channel:", err);
     }

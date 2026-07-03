@@ -1,3 +1,5 @@
+import { authenticatedFetch } from "../auth.js";
+
 const STYLES = `
   :host {
     display: flex;
@@ -474,9 +476,9 @@ class ChatMessageList extends HTMLElement {
     const existing = this.reactions.find((r) => r.messageId === messageId && r.emoji === emoji);
     const channelId = this.selectedChannelId;
     if (existing) {
-      await fetch(`/api/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, { method: "DELETE" });
+      await authenticatedFetch(`/api/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, { method: "DELETE" });
     } else {
-      await fetch(`/api/channels/${channelId}/messages/${messageId}/reactions`, {
+      await authenticatedFetch(`/api/channels/${channelId}/messages/${messageId}/reactions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emoji }),

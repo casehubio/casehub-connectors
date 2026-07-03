@@ -19,25 +19,39 @@ import jakarta.ws.rs.core.Response;
 
 import java.time.format.DateTimeParseException;
 
+import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
+
 import io.casehub.connectors.chat.model.Channel;
+import io.casehub.connectors.chat.model.ChatContent;
 import io.casehub.connectors.chat.model.ChatChannelRef;
 import io.casehub.connectors.chat.model.ChatMessageRef;
 import io.casehub.connectors.chat.model.Member;
 import io.casehub.connectors.chat.model.MemberRef;
 import io.casehub.connectors.chat.model.PresenceStatus;
 import io.casehub.connectors.chat.model.ReceivedMessage;
+import io.casehub.connectors.chat.ref.ChatBackend;
 import io.casehub.connectors.chat.spi.ChatPlatform;
 
 @Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@Authenticated
 public class ChatResource {
+
+    private static final String PLATFORM_ID = "ref";
 
     @Inject
     ChatPlatform chatPlatform;
 
     @Inject
     ChatWebSocketBroadcaster broadcaster;
+
+    @Inject
+    SecurityIdentity identity;
+
+    @Inject
+    ChatBackend chatBackend;
 
     // --- Channels ---
 
@@ -71,19 +85,33 @@ public class ChatResource {
     public Response postMessage(@PathParam("channelId") final String channelId,
                                 final PostMessageRequest request) {
         final var channelRef = new ChatChannelRef(channelId);
-        final var content = new io.casehub.connectors.chat.model.ChatContent(request.text());
-        final var result = chatPlatform.messaging().send(channelRef, content);
-        if (result.ok()) {
-            final var messages = chatPlatform.messageHistory().messages(channelRef, result.timestamp());
-            messages.stream()
-                    .filter(m -> m.messageRef().messageId().equals(result.messageRef().messageId()))
-                    .findFirst()
-                    .ifPresent(broadcaster::broadcastMessageAppend);
-        }
+        final var sender = new MemberRef(identity.getPrincipal().getName());
+        ensureMembership(channelRef, sender);
+        ensurePresence(sender);
+        final var content = new ChatContent(request.text());
+        final var msg = chatBackend.storeMessage(PLATFORM_ID, channelRef, content, sender, null);
+        broadcaster.broadcastMessageAppend(msg);
         return Response.ok(Map.of(
-                "ok", result.ok(),
-                "messageId", result.messageRef().messageId(),
-                "timestamp", result.timestamp().toString())).build();
+                "ok", true,
+                "messageId", msg.messageRef().messageId(),
+                "timestamp", msg.receivedAt().toString())).build();
+    }
+
+    private void ensureMembership(final ChatChannelRef channelRef, final MemberRef sender) {
+        final boolean isMember = chatPlatform.members().list(channelRef).stream()
+                .anyMatch(m -> m.ref().id().equals(sender.id()));
+        if (!isMember) {
+            final var member = new Member(sender, sender.id());
+            chatPlatform.memberManagement().add(channelRef, member);
+            broadcaster.broadcastMemberAppend(channelRef.id(), member);
+        }
+    }
+
+    private void ensurePresence(final MemberRef sender) {
+        if (chatPlatform.presence().of(sender) == PresenceStatus.UNKNOWN) {
+            chatPlatform.presence().set(sender, PresenceStatus.ONLINE);
+            broadcaster.broadcastPresenceReplace(sender, PresenceStatus.ONLINE);
+        }
     }
 
     @GET
@@ -112,19 +140,16 @@ public class ChatResource {
                               final PostMessageRequest request) {
         final var channelRef = new ChatChannelRef(channelId);
         final var parentRef = new ChatMessageRef(channelRef, messageId);
-        final var content = new io.casehub.connectors.chat.model.ChatContent(request.text());
-        final var result = chatPlatform.threading().reply(parentRef, content);
-        if (result.ok()) {
-            final var messages = chatPlatform.messageHistory().messages(channelRef, result.timestamp());
-            messages.stream()
-                    .filter(m -> m.messageRef().messageId().equals(result.messageRef().messageId()))
-                    .findFirst()
-                    .ifPresent(broadcaster::broadcastMessageAppend);
-        }
+        final var sender = new MemberRef(identity.getPrincipal().getName());
+        ensureMembership(channelRef, sender);
+        ensurePresence(sender);
+        final var content = new ChatContent(request.text());
+        final var msg = chatBackend.storeMessage(PLATFORM_ID, channelRef, content, sender, parentRef);
+        broadcaster.broadcastMessageAppend(msg);
         return Response.ok(Map.of(
-                "ok", result.ok(),
-                "messageId", result.messageRef().messageId(),
-                "timestamp", result.timestamp().toString())).build();
+                "ok", true,
+                "messageId", msg.messageRef().messageId(),
+                "timestamp", msg.receivedAt().toString())).build();
     }
 
     // --- Reactions ---
