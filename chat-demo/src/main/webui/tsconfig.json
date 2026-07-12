@@ -8,7 +8,9 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "declaration": false,
-    "noEmit": true
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false
   },
   "include": ["src"]
 }

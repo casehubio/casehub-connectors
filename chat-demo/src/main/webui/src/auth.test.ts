@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getToken, getIdentity, authenticatedFetch } from "./auth.js";
+import { getToken, getValidToken, getIdentity, authenticatedFetch } from "./auth.js";
 
 function createMockJwt(sub: string, exp?: number): string {
     const header = btoa(JSON.stringify({ alg: "RS256", typ: "JWT" }));
@@ -28,6 +28,17 @@ describe("auth", () => {
 
     it("getIdentity returns null when no token", () => {
         expect(getIdentity()).toBeNull();
+    });
+
+    it("getValidToken returns null for expired token", () => {
+        sessionStorage.setItem("pages-dev-auth-token", createMockJwt("alice", Date.now() / 1000 - 60));
+        expect(getValidToken()).toBeNull();
+    });
+
+    it("getValidToken returns token when not expired", () => {
+        const token = createMockJwt("alice");
+        sessionStorage.setItem("pages-dev-auth-token", token);
+        expect(getValidToken()).toBe(token);
     });
 
     it("authenticatedFetch adds Authorization header", async () => {
