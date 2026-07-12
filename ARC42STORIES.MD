@@ -14,16 +14,17 @@
 
 ### Purpose
 
-Platform library: outbound and inbound message delivery for the casehubio platform. Callers decide when, what, and to whom; this library handles transport in both directions.
+Platform library: outbound and inbound message delivery for the casehubio platform, plus a structured ChatPlatform SPI for rich interaction with chat systems (channels, threads, reactions, presence, members). Callers decide when, what, and to whom; this library handles transport and chat operations.
 
-**Library rule:** no business logic, routing, scheduling, templating, or retry orchestration. This library delivers messages and fires CDI events. Everything else is a caller concern.
+**Library rule:** no business logic, routing, scheduling, templating, or retry orchestration. This library delivers messages, fires CDI events, and exposes chat capabilities. Everything else is a caller concern.
 
 ### Stakeholders
 
 | Stakeholder | Concern |
 |---|---|
 | Application developer | Inject `ConnectorService`, call `send()` — no knowledge of transport required |
-| LLM agent | Call MCP tools (`send_slack_bot`, `list_channels`, etc.) |
+| Chat integrator | Inject `ChatPlatformService`, obtain a `ChatPlatform` — structured channel, thread, reaction, presence interaction |
+| LLM agent | Call MCP tools (`send_chat`, `list_chat_channels`, `list_channels`, etc.) |
 | `qhorus/connector-backend` | Implement `ConnectorMeshBridge` to observe MCP-initiated deliveries |
 | Custom connector implementor | Implement `Connector` as `@ApplicationScoped` CDI bean — auto-discovered |
 
@@ -71,8 +72,9 @@ Platform library: outbound and inbound message delivery for the casehubio platfo
 This library sits between casehubio application repos and external messaging platforms. It exposes three surfaces:
 
 1. **CDI SPI** — `Connector`, `ConnectorService`, `InboundConnector`, `WebhookInboundConnector`, `ConnectorDiscovery`, `ConnectorMeshBridge`
-2. **MCP tools** — 7 tools callable by LLM agents
-3. **CDI async event bus** — `InboundMessage` fired on `Event<InboundMessage>.fireAsync()`
+2. **ChatPlatform SPI** — `ChatPlatform` with 9 composed capabilities (`Messaging`, `Threading`, `Discovery`, `Reactions`, `Presence`, `Members`, `ChannelManagement`, `MemberManagement`, `MessageHistory`)
+3. **MCP tools** — 8 tools callable by LLM agents
+4. **CDI async event bus** — `InboundMessage` fired on `Event<InboundMessage>.fireAsync()`
 
 ```mermaid
 C4Context
@@ -83,7 +85,8 @@ C4Context
     System(core, "core + modules", "Connector SPIs + implementations")
   }
   System_Ext(slack_wh, "Slack Webhooks API", "Outbound via webhook URL")
-  System_Ext(slack_bot, "Slack Web API", "Bot messaging + channel listing")
+  System_Ext(slack_bot, "Slack Web API", "Bot messaging + channels + reactions\n+ presence + members + history")
+  System_Ext(discord_api, "Discord Bot API v10", "REST + Gateway WebSocket\n+ CDN attachments")
   System_Ext(teams, "MS Teams Webhooks", "Outbound via webhook URL")
   System_Ext(twilio, "Twilio REST API", "SMS send + webhook inbound")
   System_Ext(whatsapp, "Meta Cloud API", "WhatsApp send + webhook inbound")
@@ -92,7 +95,8 @@ C4Context
   Rel(app, core, "send()", "CDI injection")
   Rel(agent, core, "MCP tool call", "HTTP/MCP")
   Rel(core, slack_wh, "POST chat.postMessage", "HTTPS")
-  Rel(core, slack_bot, "POST chat.postMessage\nGET conversations.list", "HTTPS")
+  Rel(core, slack_bot, "14 Slack Web API methods", "HTTPS")
+  Rel(core, discord_api, "REST + Gateway WebSocket", "HTTPS/WSS")
   Rel(core, teams, "POST webhook", "HTTPS")
   Rel(core, twilio, "POST Messages", "HTTPS")
   Rel(core, whatsapp, "POST messages", "HTTPS")
@@ -109,7 +113,9 @@ C4Context
 | System | Direction | Protocol | Auth |
 |---|---|---|---|
 | Slack Webhooks API | Outbound | HTTPS POST | Webhook URL (no config — passed as `destination`) |
-| Slack Web API | Outbound | HTTPS POST | Bot token (`xoxb-…`) via MP Config |
+| Slack Web API | Outbound + ChatPlatform | HTTPS | Bot token (`xoxb-…`) via MP Config; 14 API methods |
+| Discord Bot API v10 | Outbound + ChatPlatform + Inbound | HTTPS + WSS | Bot token via MP Config; REST for messaging/channels/members, Gateway WebSocket for presence/inbound |
+| Discord CDN | Inbound (attachments) | HTTPS GET | No auth; SSRF-defended hostname allowlist (`cdn.discordapp.com`, `media.discordapp.net`) |
 | MS Teams | Outbound | HTTPS POST | Webhook URL (no config — passed as `destination`) |
 | Twilio SMS | Outbound + Inbound | HTTPS | Account SID + Auth Token via MP Config |
 | Meta WhatsApp Cloud | Outbound + Inbound | HTTPS | API token + phone-number-id via MP Config |
@@ -130,6 +136,9 @@ C4Context
 | Async CDI event bus | `Event<InboundMessage>.fireAsync()` — connectors deliver and return immediately; Slack's 3-second retry deadline met regardless of observer duration |
 | MCP surface isolation | `mcp` module is opt-in; `quarkus-mcp-server-core` not required in CDI-only deployments |
 | `ConnectorMeshBridge` in `core` not `mcp` | `qhorus/connector-backend` depends on `core` already; SPI placement avoids a new cross-repo dep; ADR-0003 |
+| Composed capabilities | `ChatPlatform` assembles 9 capability interfaces via Builder; each returns a capability or a graceful degradation default; platforms declare what they support natively |
+| Graceful degradation | Every capability has a no-op/empty default (`NoOpReactions`, `EmptyDiscovery`, etc.); callers never null-check — they call the method and get correct behaviour even when unsupported |
+| RichCard content model | Platform-agnostic rich content (`RichCard`: title, description, color, fields, footer, image, thumbnail) translated to Block Kit (Slack) or Discord Embed per platform |
 
 ### Layer Taxonomy
 
@@ -139,10 +148,13 @@ C4Context
 | L2 — Inbound SPI | `InboundConnector`, `WebhookInboundConnector`, `InboundMessage`, `WebhookRouter`, 4 webhook connectors, async event bus |
 | L3 — IMAP Inbound | `EmailInboundConnector`, `EmailInboundAccountProvider`, `Attachment`, IMAP IDLE, exponential backoff |
 | L4 — MCP Surface | `McpContentSanitizer`, 5 outbound MCP tools, `ConnectorMeshBridge` bridge call |
-| L5 — Slack Bot | `SlackBotClient`, `ConnectorDiscovery`, `SlackBotDiscovery`, `SlackBotMcpTool`, `ChannelDiscoveryMcpTool`, cursor pagination |
+| L5 — Slack Bot | `SlackBotClient` (16 methods / 14 Slack API endpoints), `ConnectorDiscovery`, `SlackBotDiscovery`, `ChannelDiscoveryMcpTool`, cursor pagination |
 | L6 — CloudEvents Adapter | `ConnectorsCloudEventAdapter`, `InboundConnectorTypes` — in core; observes `InboundMessage`, fires `CloudEvent` |
-| L7 — Chat SPI Extensions | `ChannelManagement`, `MemberManagement`, `MessageHistory` capabilities + `Reactions.list()`, `Presence.set()` — extends composed-capabilities pattern with auto-degradation defaults |
-| L8 — Chat Demo | `chat-demo` module (profile-gated `-Pdemo`): `SqliteChatBackend`, REST endpoints mapping 1:1 to ChatPlatform capabilities, WebSocket broadcaster, seed database. Not published. |
+| L7 — Chat Platform SPI | `ChatPlatform`, 9 capability interfaces (`Messaging`, `Threading`, `Discovery`, `Reactions`, `Presence`, `Members`, `ChannelManagement`, `MemberManagement`, `MessageHistory`), model types (`Channel`, `RichCard`, `SendResult`, etc.), degradation defaults, `ChatPlatformService`, `ChatInboundAdapter`; `chat-ref` (all native) and `chat-irc` (3 native) |
+| L8 — Discord | `discord` module (HTTP client — 19 methods, Gateway WebSocket, CDN download with SSRF defense), `chat-discord` (ChatPlatform with 8 native capabilities, `DiscordInboundConnector` via Gateway) |
+| L9 — Chat Slack | `chat-slack` (`SlackChatPlatform` with 9 native capabilities — most capable implementation; batch user fetch for members, full ts-precision message history) |
+| L10 — MCP Chat Surface | `send_chat` (unified ChatPlatform send with RichCard + threading), `list_chat_channels` (rich channel listing with member count) — extends L4 |
+| L11 — Chat Demo | `chat-demo` module (profile-gated `-Pdemo`): `SqliteChatBackend`, REST endpoints, WebSocket broadcaster, seed DB, Quinoa UI (`-Pui`) with JWT identity, responsive layout, qhorus Lit components. Not published. |
 
 ### Chapter Sequencing Rationale
 
@@ -164,13 +176,16 @@ C4Context
 | `email` | `casehub-connectors-email` | `core`, `quarkus-mailer` |
 | `email-inbound` | `casehub-connectors-email-inbound` | `core`, `angus-mail` |
 | `slack-bot` | `casehub-connectors-slack-bot` | `core` |
-| `mcp` | `casehub-connectors-mcp` | `core`, `email`, `slack-bot`, `quarkus-mcp-server-core` |
-| `chat-spi` | `casehub-connectors-chat-spi` | CDI (annotation-only) |
+| `discord` | `casehub-connectors-discord` | `core`, `quarkus-arc`, `vertx-core` |
+| `mcp` | `casehub-connectors-mcp` | `core`, `email`, `slack-bot`, `chat-spi`, `quarkus-mcp-server-core` |
+| `chat-spi` | `casehub-connectors-chat-spi` | `core`, `quarkus-arc` |
 | `chat-ref` | `casehub-connectors-chat-ref` | `chat-spi`, `quarkus-arc` |
 | `chat-irc` | `casehub-connectors-chat-irc` | `chat-spi`, `core` |
-| `chat-demo` | `casehub-connectors-chat-demo` | `chat-spi`, `chat-ref`, `core`, `quarkus-rest-jackson`, `quarkus-websockets-next`, `sqlite-jdbc`, `HikariCP` (profile-gated `-Pdemo`) |
+| `chat-discord` | `casehub-connectors-chat-discord` | `chat-spi`, `core`, `discord` |
+| `chat-slack` | `casehub-connectors-chat-slack` | `chat-spi`, `core`, `slack-bot` |
+| `chat-demo` | `casehub-connectors-chat-demo` | `chat-spi`, `chat-ref`, `core`, `casehub-pages-auth`, `quarkus-rest-jackson`, `quarkus-websockets-next`, `sqlite-jdbc`, `HikariCP` (profile-gated `-Pdemo`) |
 
-`email` and `email-inbound` are separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) share no infrastructure. `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments. `mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM.
+`email` and `email-inbound` are separate because `quarkus-mailer` (SMTP) and `angus-mail` (IMAP) share no infrastructure. `webhook` is separate because `quarkus-rest` is unnecessary for outbound-only deployments. `mcp` is separate because `quarkus-mcp-server-core` is not in the Quarkus BOM. `discord` (HTTP client + Gateway) is separate from `chat-discord` (ChatPlatform) because the client can be consumed independently. `chat-slack` depends on `slack-bot` (existing HTTP client) rather than duplicating Slack API calls.
 
 ```mermaid
 C4Container
@@ -198,10 +213,26 @@ C4Container
     Container(sanitizer, "McpContentSanitizer", "Java", "Truncates + strips control chars before bridge")
   }
   Container_Boundary(b5, "Layer L5 — Slack Bot") {
-    Container(slack_bot_client, "SlackBotClient", "Java, HttpClient", "chat.postMessage + paginated conversations.list")
+    Container(slack_bot_client, "SlackBotClient", "Java, HttpClient", "16 methods / 14 Slack API endpoints")
     Container(discovery_spi, "ConnectorDiscovery SPI", "Java interface", "discover() → List<DiscoveredTarget>")
-    Container(slack_discovery, "SlackBotDiscovery", "CDI", "ConnectorDiscovery via SlackBotClient.listChannels()")
-    Container(slack_mcp, "SlackBotMcpTool · ChannelDiscoveryMcpTool", "Quarkus MCP, @Blocking", "send_slack_bot · list_channels")
+    Container(slack_discovery, "SlackBotDiscovery", "CDI", "ConnectorDiscovery via SlackBotClient")
+  }
+  Container_Boundary(b7, "Layer L7 — Chat Platform SPI") {
+    Container(chat_spi, "ChatPlatform SPI", "Java interfaces", "9 capabilities + Builder\n+ graceful degradation defaults")
+    Container(chat_model, "Model", "Java records", "Channel · RichCard · SendResult\nMember · PresenceStatus")
+    Container(chat_service, "ChatPlatformService", "CDI", "Platform lookup by id")
+  }
+  Container_Boundary(b8, "Layer L8 — Discord") {
+    Container(discord_client, "DiscordClient", "Java, HttpClient", "19 REST methods (v10)")
+    Container(discord_gw, "DiscordGateway", "Vert.x WebSocket", "Presence + inbound events")
+    Container(chat_discord, "DiscordChatPlatform", "CDI", "8 native capabilities")
+  }
+  Container_Boundary(b9, "Layer L9 — Chat Slack") {
+    Container(chat_slack, "SlackChatPlatform", "CDI", "9 native capabilities\n(most capable impl)")
+  }
+  Container_Boundary(b10, "Layer L10 — MCP Chat Surface") {
+    Container(chat_mcp, "ChatPlatformMcpTool", "Quarkus MCP, @Blocking", "send_chat · list_chat_channels")
+    Container(disc_mcp, "ChannelDiscoveryMcpTool", "Quarkus MCP, @Blocking", "list_channels")
   }
 ```
 
@@ -258,6 +289,45 @@ sequenceDiagram
   InboundConnectorService->>Observer: Event<InboundMessage>.fireAsync()
 ```
 
+### ChatPlatform Capability Call
+
+```mermaid
+sequenceDiagram
+  participant Caller
+  participant ChatPlatformService
+  participant ChatPlatform
+  participant Capability as Messaging / Reactions / ...
+  participant ExternalAPI as Slack / Discord / IRC
+  Caller->>ChatPlatformService: platform("slack")
+  ChatPlatformService-->>Caller: ChatPlatform
+  Caller->>ChatPlatform: messaging()
+  ChatPlatform-->>Caller: Messaging (native or degraded)
+  Caller->>Capability: send(channelRef, content)
+  Capability->>ExternalAPI: Platform-specific API call
+  ExternalAPI-->>Capability: Response
+  Capability-->>Caller: SendResult
+```
+
+### Discord Gateway Inbound
+
+```mermaid
+sequenceDiagram
+  participant Discord as Discord Gateway (WSS)
+  participant DiscordGateway
+  participant PresenceCache as DiscordGatewayPresenceCache
+  participant Translator as DiscordInboundTranslator
+  participant InboundService as InboundConnectorService
+  participant Observer
+  Discord->>DiscordGateway: MESSAGE_CREATE / PRESENCE_UPDATE
+  alt Presence event
+    DiscordGateway->>PresenceCache: update(userId, status)
+  else Message event
+    DiscordGateway->>Translator: translate(MESSAGE_CREATE payload)
+    Translator->>InboundService: receive(InboundMessage)
+    InboundService->>Observer: Event<InboundMessage>.fireAsync()
+  end
+```
+
 ---
 
 ## §7 Deployment View
@@ -272,6 +342,13 @@ This is a Java library — no standalone deployment. Consuming applications add 
 | `email-inbound` | Inbound IMAP email |
 | `slack-bot` | Slack bot messaging + channel discovery |
 | `mcp` | MCP tool surface for LLM agents |
+| `chat-spi` | ChatPlatform SPI — capability interfaces and model types |
+| `chat-ref` | In-memory ChatPlatform — SPI contract testing |
+| `chat-irc` | IRC ChatPlatform — bridging to IRC servers |
+| `discord` | Discord Bot REST + Gateway client |
+| `chat-discord` | Discord ChatPlatform implementation |
+| `chat-slack` | Slack ChatPlatform implementation |
+| `chat-demo` | Demo chat app (profile-gated `-Pdemo`, not published) |
 
 Consuming app adds `quarkus-mcp-server-http` (not in this library) for MCP transport.
 
@@ -330,7 +407,8 @@ Full protocol docs: `docs/protocols/connectors/`
 
 | Journey | Description | Chapters | Status |
 |---|---|---|---|
-| Connector Infrastructure | End-to-end message transport for the casehubio platform — outbound delivery, inbound reception, and MCP agent access | 5 | ✅ Complete |
+| Connector Infrastructure | End-to-end message transport for the casehubio platform — outbound delivery, inbound reception, MCP agent access, CloudEvent bridging | 6 | ✅ Complete |
+| Chat Platform | Structured interaction with chat systems — capability-composed SPI, graceful degradation, implementations for Slack/Discord/IRC, unified MCP surface, demo UI | 4 | 🟢 Active |
 
 ### §9.2 Chapter Index
 
@@ -341,22 +419,38 @@ Full protocol docs: `docs/protocols/connectors/`
 | 3 | [IMAP Inbound Email](#chapter-3--imap-inbound-email) | Connector Infrastructure | + L3; L2 Medium | High | ✅ |
 | 4 | [MCP Tool Surface](#chapter-4--mcp-tool-surface) | Connector Infrastructure | + L4; L1 Medium | High | ✅ |
 | 5 | [Slack Bot Client + MCP Tools](#chapter-5--slack-bot-client--mcp-tools) | Connector Infrastructure | + L5; L4 Medium | High | ✅ |
+| 6 | [CloudEvents Adapter](#chapter-6--cloudevents-adapter) | Connector Infrastructure | + L6 | Medium | ✅ |
+| 7 | [Chat Platform SPI + Implementations](#chapter-7--chat-platform-spi--implementations) | Chat Platform | + L7; L5 Medium | High | ✅ |
+| 8 | [Discord](#chapter-8--discord) | Chat Platform | + L8; L7 Low | High | ✅ |
+| 9 | [Slack ChatPlatform + MCP Consolidation](#chapter-9--slack-chatplatform--mcp-consolidation) | Chat Platform | + L9, L10; L5 High, L7 Low | High | ✅ |
+| 10 | [Chat Demo](#chapter-10--chat-demo) | Chat Platform | + L11; L7 Low | High | ✅ |
 
 **Layer × Chapter Matrix**
 
-| Layer | C1 | C2 | C3 | C4 | C5 |
-|---|---|---|---|---|---|
-| L1 — Outbound SPI | High | Low | — | Medium | — |
-| L2 — Inbound SPI | — | High | Medium | — | — |
-| L3 — IMAP Inbound | — | — | High | — | — |
-| L4 — MCP Surface | — | — | — | High | Medium |
-| L5 — Slack Bot | — | — | — | — | High |
+| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| L1 — Outbound SPI | High | Low | — | Medium | — | — | — | — | — | — |
+| L2 — Inbound SPI | — | High | Medium | — | — | — | — | — | — | — |
+| L3 — IMAP Inbound | — | — | High | — | — | — | — | — | — | — |
+| L4 — MCP Surface | — | — | — | High | Medium | — | — | — | — | — |
+| L5 — Slack Bot | — | — | — | — | High | — | Medium | — | High | — |
+| L6 — CloudEvents | — | — | — | — | — | High | — | — | — | — |
+| L7 — Chat Platform SPI | — | — | — | — | — | — | High | Low | Low | Low |
+| L8 — Discord | — | — | — | — | — | — | — | High | — | — |
+| L9 — Chat Slack | — | — | — | — | — | — | — | — | High | — |
+| L10 — MCP Chat | — | — | — | — | — | — | — | — | High | — |
+| L11 — Chat Demo | — | — | — | — | — | — | — | — | — | High |
 
 **Sequencing rationale:**
 - C1 before C2: `ConnectorService`, `ConnectorMessage`, and `InboundMessage` (C1) are the data model and service layer C2's `InboundConnectorService` and `WebhookRouter` build on
 - C2 before C3: `InboundConnectorService` and `InboundMessageSink` (C2) are the delivery sink `EmailInboundConnector` calls
 - C3 before C4: C4's MCP tools call `ConnectorService` across all 5 transports; complete integration tests require all transports present
 - C4 before C5: `SlackBotMcpTool` and `ChannelDiscoveryMcpTool` extend the MCP surface and use the `ConnectorMeshBridge` bridge call pattern from C4
+- C5 before C6: CloudEvents adapter observes `InboundMessage` events established in C2; independent of C5 but placed after it chronologically
+- C5 before C7: Chat SPI depends on `core` (for `InboundMessage` → `ReceivedMessage` translation); implementations reuse existing HTTP clients from L5 (SlackBotClient)
+- C7 before C8: Discord ChatPlatform implements the SPI established in C7; `discord` HTTP client is new but `chat-discord` depends on `chat-spi`
+- C7+C8 before C9: Slack ChatPlatform + MCP consolidation required chat-spi (C7) and motivated by feature parity with Discord (C8); MCP tools unified across all platforms
+- C7 before C10: Chat Demo depends on `chat-spi` and `chat-ref` (C7) for its backend
 
 ```mermaid
 flowchart LR
@@ -364,11 +458,21 @@ flowchart LR
   C2 --> C3["C3: IMAP Inbound\n+L3"]
   C3 --> C4["C4: MCP Surface\n+L4"]
   C4 --> C5["C5: Slack Bot\n+L5"]
+  C5 --> C6["C6: CloudEvents\n+L6"]
+  C5 --> C7["C7: Chat SPI\n+L7"]
+  C7 --> C8["C8: Discord\n+L8"]
+  C7 --> C10["C10: Chat Demo\n+L11"]
+  C8 --> C9["C9: Slack+MCP\n+L9,L10"]
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
   style C3 fill:#90EE90,color:#000
   style C4 fill:#90EE90,color:#000
   style C5 fill:#90EE90,color:#000
+  style C6 fill:#90EE90,color:#000
+  style C7 fill:#90EE90,color:#000
+  style C8 fill:#90EE90,color:#000
+  style C9 fill:#90EE90,color:#000
+  style C10 fill:#90EE90,color:#000
 ```
 
 ---
@@ -471,6 +575,115 @@ LLM agents post to Slack via bot token (`send_slack_bot`), receive a thread time
 |---|---|
 | L4 — MCP Surface | Medium (2 new tools; `@Blocking` retrofit to existing 5) |
 | L5 — Slack Bot | High |
+
+---
+
+#### Chapter 6 — CloudEvents Adapter
+
+**Journey:** Connector Infrastructure | **Sequence:** 6 of 6 | **Status:** ✅
+**Delivered:** 2026-06-21 | **Issues:** #20, #23 | **Blog:** —
+
+**What this delivers**
+Inbound messages are automatically bridged to CloudEvents. `ConnectorsCloudEventAdapter` observes `@ObservesAsync InboundMessage` and fires `Event<CloudEvent>.fireAsync()` with semantic type fields (`InboundConnectorTypes`: SLACK, EMAIL, SMS, WHATSAPP, TEAMS) and `tenancyId` extension. Follows the canonical CloudEvent adapter pattern (GE-20260621-629712).
+
+**Accountability gaps closed**
+- No CloudEvent integration for inbound messages → `ConnectorsCloudEventAdapter` closes it
+- Provider-specific types leak to consumers → `InboundConnectorTypes` provides semantic constants
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L6 — CloudEvents Adapter | High |
+
+---
+
+#### Chapter 7 — Chat Platform SPI + Implementations
+
+**Journey:** Chat Platform | **Sequence:** 1 of 4 | **Status:** ✅
+**Delivered:** 2026-06-25 | **Issues:** #24, #25, #26, #27 | **Blog:** `blog/2026-06-25-mdp13-duck-typing-for-chat-platforms.md`
+
+**What this delivers**
+A composed-capabilities SPI for structured chat interaction. `ChatPlatform` exposes 9 capability interfaces (`Messaging`, `Threading`, `Discovery`, `Reactions`, `Presence`, `Members`, `ChannelManagement`, `MemberManagement`, `MessageHistory`) via a Builder that accepts native implementations and fills gaps with graceful degradation defaults. Three implementations: `chat-ref` (in-memory, all capabilities native — SPI contract testing), `chat-irc` (IRC protocol bridge, 3 native: Messaging, Threading, Members), and the demo chat service (`chat-demo` with SQLite backend, REST endpoints, WebSocket broadcaster).
+
+**Accountability gaps closed**
+- No structured chat interaction model → `ChatPlatform` SPI closes it
+- Platform capability differences handled by caller → degradation defaults close it
+- No in-memory implementation for testing → `chat-ref` closes it
+- No demo/dev environment for chat features → `chat-demo` closes it
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L5 — Slack Bot | Medium (12 new methods on `SlackBotClient` for chat capabilities) |
+| L7 — Chat Platform SPI | High |
+
+---
+
+#### Chapter 8 — Discord
+
+**Journey:** Chat Platform | **Sequence:** 2 of 4 | **Status:** ✅
+**Delivered:** 2026-06-30 | **Issues:** #29, #30, #33, #34, #35, #36 | **Blog:** `blog/2026-06-29-mdp15-discord-and-what-the-spi-survived.md`, `blog/2026-06-30-mdp17-three-cdn-bytes-and-a-virtual-thread.md`
+
+**What this delivers**
+Full Discord integration: `discord` module (HTTP client with 19 REST methods, Gateway WebSocket for presence and inbound events, CDN attachment download with SSRF defense) and `chat-discord` (ChatPlatform with 8 native capabilities — all except MemberManagement). `DiscordInboundConnector` translates Gateway MESSAGE_CREATE events to `InboundMessage` via the L2 event bus. Rich embed support for outbound messages. #35 replaced JDK WebSocket with Vert.x due to RFC 6455 GUID compliance failure.
+
+**Accountability gaps closed**
+- No Discord integration → `discord` module + `chat-discord` close it
+- No Discord inbound → Gateway-based `DiscordInboundConnector` closes it
+- JDK WebSocket incompatible with Discord Gateway → Vert.x WebSocket closes it (#35)
+- Attachment URLs exploitable for SSRF → hostname allowlist closes it
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L7 — Chat Platform SPI | Low (SPI validated against real external platform) |
+| L8 — Discord | High |
+
+---
+
+#### Chapter 9 — Slack ChatPlatform + MCP Consolidation
+
+**Journey:** Chat Platform | **Sequence:** 3 of 4 | **Status:** ✅
+**Delivered:** 2026-07-03 | **Issues:** #37, #38, #40, #41, #42, #44, #46, #47 | **Blog:** `blog/2026-06-26-mdp14-first-real-chat-platform.md`, `blog/2026-07-01-mdp18-content-not-layout.md`
+
+**What this delivers**
+`SlackChatPlatform` — the most capable implementation (9/9 native capabilities). Batch user fetch via `users.list` for member enrichment. Full `ts`-precision message history. `RichCard` model for platform-agnostic rich content, translated to Block Kit (Slack) or Discord Embed per platform. MCP consolidation: `send_chat` replaces per-platform send tools; `list_chat_channels` provides rich channel listing with member count. `SlackBotClient` expanded from 4 to 16 methods (14 Slack API endpoints).
+
+**Accountability gaps closed**
+- No Slack ChatPlatform → `SlackChatPlatform` closes it (9/9 native)
+- Per-platform MCP tools require callers to know which tool → `send_chat` unifies routing
+- No rich content model → `RichCard` closes it with per-platform translation
+- No channel member count in discovery → `Channel.memberCount` closes it
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L5 — Slack Bot | High (16 methods, 14 API endpoints — up from 4 methods) |
+| L7 — Chat Platform SPI | Low (`RichCard`, `Channel.memberCount`, `ChatContent.cards`) |
+| L9 — Chat Slack | High |
+| L10 — MCP Chat Surface | High |
+
+---
+
+#### Chapter 10 — Chat Demo
+
+**Journey:** Chat Platform | **Sequence:** 4 of 4 | **Status:** ✅
+**Delivered:** 2026-07-12 | **Issues:** #28, #49, #50, #51, #52, #54, #61, #79 | **Blog:** `blog/2026-07-02-mdp19-making-the-demo-talk-back.md`, `blog/2026-07-03-mdp20-the-platforms-own-identity.md`
+
+**What this delivers**
+Profile-gated demo chat service with SQLite persistence, REST/WebSocket endpoints, and a Quinoa frontend. JWT-based user identity via `casehub-pages-auth` (dev-auth login, `@Authenticated` REST, `HttpUpgradeCheck` WebSocket auth, auto-membership, presence auto-create). Responsive layout (phone drawers, tablet single-sidebar with tabs, desktop three-column). Qhorus-native Lit component family: 4 primitives (qhorus-message, reaction-bar, thread, message-input), 3 composites (channel-feed, channel-nav, member-panel), workbench with adapter. Inline reply threading, emoji reactions with palette, channel create/delete UI.
+
+**Accountability gaps closed**
+- No interactive demo for chat features → chat-demo with Quinoa UI closes it
+- No user identity in demo → JWT auth with `casehub-pages-auth` closes it
+- No mobile-responsive chat UI → responsive layout (phone/tablet/desktop) closes it
+- No qhorus-native rendering → Lit components with speech acts, actor types, commitment states close it
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L7 — Chat Platform SPI | Low (demo validates SPI contract from consumer perspective) |
+| L11 — Chat Demo | High |
 
 ---
 
@@ -803,7 +1016,7 @@ Fail-soft MCP surface — `@Tool @Blocking` with catch-all exception handler ret
 
 #### Layer — L5 Slack Bot
 
-**Participates in chapters:** C5
+**Participates in chapters:** C5, C9
 **Architectural patterns:** Cursor pagination with fail-soft `PageResult`, CDI SPI for runtime discovery, `@All List<T>` aggregation
 **Key protocols:** PP-20260610-83747b (paginating-client-fail-soft), PP-20260607-9794cb (shared-http-client)
 **Design refs:** `docs/specs/2026-06-06-slack-channel-backend-design.md`, `docs/specs/2026-06-08-mcp-slack-bot-tools-design.md`, `docs/superpowers/specs/2026-06-09-slack-listchannels-pagination-design.md`
@@ -823,6 +1036,8 @@ Fail-soft MCP surface — `@Tool @Blocking` with catch-all exception handler ret
 - **`ConnectorDiscovery` SPI** — `discover()` returns `List<DiscoveredTarget>` for runtime-discoverable targets; `ChannelDiscoveryMcpTool` aggregates via `@All List<ConnectorDiscovery>`
 
 Not closed here: full Slack Events API inbound (messages sent to the bot) — see §12.
+
+**C9 update:** `SlackBotClient` expanded from 4 to 16 public methods (14 Slack API endpoints) for Chat Platform capabilities: reactions (`add`, `remove`, `get`), presence (`getPresence`), members (`listConversationMembers`, `listUsers`), channels (`createConversation`, `getConversationInfo`, `archiveConversation`), member management (`inviteToConversation`, `kickFromConversation`), history (`getHistory`), and Block Kit support (`postMessage` with `blocksJson`). `SlackBotMcpTool` (`send_slack_bot`) removed — replaced by unified `send_chat` in L10.
 
 ##### Accountability gaps closed
 
@@ -886,6 +1101,183 @@ Cursor pagination with `PageResult` fail-soft — loop until cursor empty or MAX
 
 ---
 
+#### Layer — L6 CloudEvents Adapter
+
+**Participates in chapters:** C6
+**Architectural patterns:** CDI async event bridging, canonical CloudEvent adapter pattern
+**Design refs:** GE-20260621-629712
+**Issues:** #20, #23
+**Completed:** 2026-06-21
+
+##### What it adds
+
+**Before:** Inbound messages available only as `InboundMessage` CDI events — platform-specific connector IDs leak to consumers.
+**After:** `ConnectorsCloudEventAdapter` observes `@ObservesAsync InboundMessage` and fires `Event<CloudEvent>.fireAsync()` with semantic type constants and tenancy extension.
+
+- **Semantic types** — `InboundConnectorTypes` constants (`SLACK`, `EMAIL`, `SMS`, `WHATSAPP`, `TEAMS`) map provider-specific connector IDs to platform-agnostic categories
+- **Tenancy extension** — `tenancyId` CloudEvent extension populated from `InboundMessage.tenancyId()` when non-null
+- **Double-async** — adapter observes async (`@ObservesAsync InboundMessage`), fires async (`Event<CloudEvent>.fireAsync()`) — fully non-blocking from webhook to final observer
+
+##### Key files
+
+- `core/src/main/java/io/casehub/connectors/ConnectorsCloudEventAdapter.java` — CDI adapter; observes InboundMessage, fires CloudEvent
+- `core/src/main/java/io/casehub/connectors/InboundConnectorTypes.java` — semantic transport category constants
+
+---
+
+#### Layer — L7 Chat Platform SPI
+
+**Participates in chapters:** C7, C8, C9, C10
+**Architectural patterns:** Composed capabilities, graceful degradation via no-op defaults, Builder pattern
+**Issues:** #24, #25, #26, #37, #42, #44
+**Blog:** `blog/2026-06-25-mdp13-duck-typing-for-chat-platforms.md`
+**Completed:** 2026-06-25 (foundation); extended through C8–C10
+
+##### What it adds
+
+**Before:** No structured chat interaction — each consumer implemented its own Slack/Discord/IRC calls.
+**After:** `ChatPlatform` SPI with 9 capability interfaces assembled via Builder. Platforms declare native capabilities; unsupported ones get graceful degradation defaults automatically.
+
+- **9 capabilities** — `Messaging` (send to channel), `Threading` (threaded replies), `Discovery` (list channels), `Reactions` (add/remove/list emoji), `Presence` (online status), `Members` (list channel members), `ChannelManagement` (create/find/delete), `MemberManagement` (add/remove members), `MessageHistory` (query past messages)
+- **Graceful degradation** — every capability has a default: `NoOpReactions`, `EmptyDiscovery`, `UnknownPresence`, `ChannelFallbackThreading` (falls back to channel-level messaging), etc.
+- **RichCard** — platform-agnostic rich content (title, description, color, fields, footer, image, thumbnail); translated to Block Kit (Slack) or Discord Embed per platform
+- **ChatInboundAdapter** — translates `InboundMessage` (L2) to `ReceivedMessage` using platform-specific `InboundTranslator` implementations
+- **chat-ref** — in-memory implementation, all capabilities native; SPI contract testing
+- **chat-irc** — IRC implementation, 3 native capabilities (Messaging, Threading, Members)
+
+##### Key files
+
+- `chat-spi/src/main/java/io/casehub/connectors/chat/spi/ChatPlatform.java` — main SPI; 9 capability accessors + `supports()` + `Builder`
+- `chat-spi/src/main/java/io/casehub/connectors/chat/spi/DefaultChatPlatform.java` — Builder output; fills missing capabilities with degradation defaults
+- `chat-spi/src/main/java/io/casehub/connectors/chat/model/RichCard.java` — platform-agnostic rich content record
+- `chat-spi/src/main/java/io/casehub/connectors/chat/model/Channel.java` — channel record with memberCount
+- `chat-spi/src/main/java/io/casehub/connectors/chat/spi/ChatPlatformService.java` — CDI service for platform lookup by ID
+- `chat-ref/` — in-memory implementation with `ChatBackend` storage
+
+##### Architectural decisions
+
+**Why composed capabilities rather than a monolithic interface:** chat platforms vary wildly — IRC has no reactions, Slack has no Gateway, Discord has no archive. A monolithic interface forces empty implementations everywhere. Composed capabilities let each platform declare what it supports, and the Builder fills gaps with correct degradation defaults. Callers never null-check.
+
+**Why `ChatBackend` is internal to `chat-ref`, not in `chat-spi`:** each ChatPlatform implementation owns its own storage strategy. Slack uses `SlackBotClient`, Discord uses `DiscordClient`, ref uses in-memory `ChatBackend`. Storage is not a platform-wide SPI — it's an implementation detail.
+
+---
+
+#### Layer — L8 Discord
+
+**Participates in chapters:** C8
+**Architectural patterns:** REST + WebSocket dual-transport, SSRF-defended CDN download, Gateway event dispatch
+**Issues:** #29, #30, #33, #34, #35, #36
+**Blog:** `blog/2026-06-29-mdp15-discord-and-what-the-spi-survived.md`, `blog/2026-06-30-mdp17-three-cdn-bytes-and-a-virtual-thread.md`
+**Completed:** 2026-06-30
+
+##### What it adds
+
+**Before:** No Discord integration.
+**After:** Full Discord support via two modules: `discord` (HTTP client + Gateway) and `chat-discord` (ChatPlatform with 8/9 native capabilities).
+
+- **DiscordClient** — 19 REST methods against Bot API v10: messaging (with embeds and replies), channel CRUD, reactions, member listing, guild info, Gateway URL, CDN attachment download
+- **DiscordGateway** — Vert.x WebSocket client for Gateway events: MESSAGE_CREATE (→ inbound), PRESENCE_UPDATE (→ presence cache), GUILD_MEMBERS_CHUNK; heartbeat, identify, reconnect
+- **DiscordGatewayPresenceCache** — in-memory presence cache populated by Gateway events
+- **DiscordChatPlatform** — 8 native capabilities (all except MemberManagement); presence via Gateway cache
+- **DiscordInboundConnector** — `InboundConnector` implementation; Gateway MESSAGE_CREATE → `InboundMessage` via `DiscordInboundTranslator`
+- **SSRF defense** — CDN attachment download restricted to allowlisted hostnames (`cdn.discordapp.com`, `media.discordapp.net`)
+- **Rich embeds** — `DiscordEmbed` record serialized from `RichCard` with Discord-specific limit enforcement (title ≤ 256, description ≤ 4096, etc.)
+
+##### Key files
+
+- `discord/src/main/java/io/casehub/connectors/discord/DiscordClient.java` — 19 REST methods
+- `discord/src/main/java/io/casehub/connectors/discord/DiscordGateway.java` — WebSocket Gateway client (Vert.x)
+- `discord/src/main/java/io/casehub/connectors/discord/DiscordGatewayPresenceCache.java` — presence cache
+- `chat-discord/src/main/java/io/casehub/connectors/chat/discord/DiscordChatPlatform.java` — ChatPlatform implementation
+- `chat-discord/src/main/java/io/casehub/connectors/chat/discord/DiscordInboundConnector.java` — Gateway → InboundMessage
+
+##### Gotchas
+
+**Symptom:** Discord Gateway WebSocket connection fails silently with no error message.
+**Cause:** JDK `java.net.http.WebSocket` sends an incorrect `Sec-WebSocket-Accept` header — the GUID concatenation uses a different base than RFC 6455 requires.
+**Fix:** Use Vert.x `WebSocketClient` instead. #35.
+
+---
+
+#### Layer — L9 Chat Slack
+
+**Participates in chapters:** C9
+**Architectural patterns:** Batch user fetch, ts-precision message history, Block Kit translation
+**Issues:** #40
+**Blog:** `blog/2026-06-26-mdp14-first-real-chat-platform.md`
+**Completed:** 2026-06-30
+
+##### What it adds
+
+**Before:** Slack interaction limited to bot messaging and channel listing via `SlackBotClient`.
+**After:** `SlackChatPlatform` — the most capable ChatPlatform implementation (9/9 native capabilities).
+
+- **9 native capabilities** — all capability interfaces implemented against Slack Web API
+- **Batch user fetch** — `users.list` populates a user cache; `Members` enriches channel member IDs with display names and avatars
+- **Full message history** — `conversations.history` with `ts`-precision timestamps; returns `ReceivedMessage` list
+- **Block Kit** — `RichCard` translated to Block Kit `blocks` JSON via `SlackBlockKitTranslator`; posted alongside text for rich formatting
+- **SlackBotClient expansion** — grew from 4 to 16 public methods (14 Slack API endpoints): reactions, presence, members, channels, history, archive
+
+##### Key files
+
+- `chat-slack/src/main/java/io/casehub/connectors/chat/slack/SlackChatPlatform.java` — 9/9 native capabilities
+- `slack-bot/src/main/java/io/casehub/connectors/slack/bot/SlackBotClient.java` — 16 methods / 14 Slack API endpoints
+
+---
+
+#### Layer — L10 MCP Chat Surface
+
+**Participates in chapters:** C9
+**Architectural patterns:** Unified platform routing, RichCard serialization
+**Issues:** #37, #41, #42, #46, #47
+**Blog:** `blog/2026-07-01-mdp18-content-not-layout.md`
+**Completed:** 2026-07-03
+
+##### What it adds
+
+**Before:** Per-platform MCP tools (`send_slack_bot`, per-connector sends); callers must know which tool to call.
+**After:** `send_chat` unifies sending across all ChatPlatform implementations by platform ID; `list_chat_channels` provides rich channel listing with member count.
+
+- **send_chat** — routes by platform ID (`"slack"`, `"discord"`, `"irc"`, `"ref"`); supports RichCard via `cards` JSON parameter; optional `threadId` for threaded replies
+- **list_chat_channels** — returns channels with name, ID, topic, description, private flag, member count
+- **list_channels** — retained; cross-connector thin overview via `ConnectorDiscovery` SPI
+
+##### Key files
+
+- `mcp/src/main/java/io/casehub/connectors/mcp/ChatPlatformMcpTool.java` — `send_chat` + `list_chat_channels`
+- `mcp/src/main/java/io/casehub/connectors/mcp/ChannelDiscoveryMcpTool.java` — `list_channels`
+
+---
+
+#### Layer — L11 Chat Demo
+
+**Participates in chapters:** C10
+**Architectural patterns:** Profile-gated module, SQLite with HikariCP, WebSocket broadcasting, JWT identity
+**Issues:** #26, #27, #28, #49, #50, #51, #52, #54, #61, #79
+**Blog:** `blog/2026-07-02-mdp19-making-the-demo-talk-back.md`, `blog/2026-07-03-mdp20-the-platforms-own-identity.md`
+**Completed:** 2026-07-12
+
+##### What it adds
+
+**Before:** No interactive chat demo environment.
+**After:** Profile-gated demo chat service (`-Pdemo`) with SQLite persistence, REST/WebSocket endpoints, pre-populated seed database, and an optional Quinoa frontend (`-Pdemo -Pui`).
+
+- **SqliteChatBackend** — SQLite storage via HikariCP; REST endpoints map 1:1 to ChatPlatform capabilities
+- **WebSocket broadcaster** — real-time event delivery; `buildSnapshot()` includes channels, messages, members, reactions
+- **JWT identity** — `casehub-pages-auth` integration: dev-auth login, `@Authenticated` REST guard, `HttpUpgradeCheck` WebSocket auth, auto-membership and presence auto-create on first authenticated request
+- **Quinoa frontend** — responsive layout (phone drawers, tablet single-sidebar with tabs, desktop three-column), dark mode, dockable panels
+- **Qhorus Lit components** — 4 primitives (qhorus-message, reaction-bar, thread, message-input), 3 composites (channel-feed, channel-nav, member-panel), workbench with adapter; qhorus-native data model (speech acts, actor types, commitment states)
+- **Interactive features** — channel create/delete, emoji reactions with palette, inline reply threading, auto-expanding multiline textarea, login gate (`<pages-dev-auth>`), identity widget (`<pages-identity>`)
+
+##### Key files
+
+- `chat-demo/src/main/java/.../SqliteChatBackend.java` — SQLite storage
+- `chat-demo/src/main/java/.../ChatDemoResource.java` — REST endpoints
+- `chat-demo/src/main/java/.../ChatDemoWebSocket.java` — WebSocket broadcaster
+- `chat-demo/src/main/webui/src/qhorus/` — Lit component family
+
+---
+
 ## §10 Architectural Decisions
 
 All layer-specific decisions are recorded inline in §9.4. Cross-cutting decisions:
@@ -901,6 +1293,12 @@ All layer-specific decisions are recorded inline in §9.4. Cross-cutting decisio
 | — | `ChatBackend` internal to `chat-ref`, not in `chat-spi` | Each ChatPlatform impl owns its storage (IrcClient for IRC, SlackBotClient for Slack, ChatBackend for ref/demo); persistence is not a platform-wide SPI |
 | — | `Channel` record gains `description` field | Topic is dynamic, description is static — Slack/Discord distinguish them; IRC passes null. Breaking change, mechanical migration. |
 | — | `Presence` no longer a functional interface | Adding `set()` breaks SAM status; intentional — degradation model requires explicit method implementations |
+| — | Composed capabilities via Builder, not interface inheritance | `ChatPlatform.Builder` assembles from individual capability instances; platforms declare what they support natively; unsupported capabilities get degradation defaults automatically |
+| — | RichCard as platform-agnostic content model | Translated per-platform (Block Kit for Slack, Embed for Discord); callers never touch platform-specific formats |
+| — | Vert.x WebSocket for Discord Gateway, not JDK | JDK `java.net.http.WebSocket` sends an incorrect `Sec-WebSocket-Accept` header (missing RFC 6455 GUID concatenation); Vert.x handles it correctly; #35 |
+| — | SSRF defense on Discord CDN downloads | Hostname allowlist (`cdn.discordapp.com`, `media.discordapp.net`) verified before fetching; prevents open-redirect exploitation via crafted attachment URLs |
+| — | `send_chat` replaces per-platform MCP tools | Unified ChatPlatform send tool routes by platform ID; callers no longer need to know which tool to call for which platform |
+| — | `ChannelManagement.delete()` — Slack archives, Discord deletes | Slack API has no channel delete; `conversations.archive` is the closest equivalent. Discord `DELETE /channels/{id}` is a true delete. Caller sees the same `delete()` method. |
 
 Full decision records with alternatives considered: `docs/adr/`
 
@@ -927,6 +1325,9 @@ Full decision records with alternatives considered: `docs/adr/`
 | 2 | `ConnectorMeshBridge` Qhorus implementation | Closed | casehubio/qhorus#249 closed 2026-06-12. `ConnectorMeshBridge` implemented in `qhorus/connector-backend`. MCP deliveries now observed in Qhorus. |
 | 3 | Slack Events API inbound not implemented | Low | Slack inbound via bot token (full Events API — messages sent to bot) not implemented. `SlackBotClient` covers outbound only. No open issue. |
 | 4 | WhatsApp and email edge-case content | Low | Media-only WhatsApp messages yield content = media URL or empty string. HTML-only emails yield raw HTML. Neither is normalised to plain text. Documented. |
+| 5 | Discord Gateway reconnection | Medium | Gateway WebSocket reconnects on close, but no resume/session tracking — missed events during disconnection are lost. Presence cache goes stale until next GUILD_MEMBERS_CHUNK. |
+| 6 | Chat-demo SQLite concurrency | Low | Single-writer SQLite with WAL. Adequate for demo; not a production data store. Profile-gated `-Pdemo`. |
+| 7 | `ChannelManagement.delete()` semantic gap | Low | Slack archives (reversible), Discord deletes (irreversible). Same `delete()` API, different consequences. Documented in caller-facing Javadoc. |
 
 ---
 
@@ -950,4 +1351,13 @@ Full decision records with alternatives considered: `docs/adr/`
 | `McpContentSanitizer` | Truncates content to 500 chars and strips ASCII control chars (≤ 0x1F, 0x7F) before passing to `ConnectorMeshBridge`. Applied to observability only. |
 | `InboundMessageSink` | Delivery interface called by pull connectors (`InboundConnector.start(sink)`). Implemented by `InboundConnectorService`. |
 | `PageResult` | Private inner record in `SlackBotClient`: ok, channels, nextCursor, error. Returned by `parsePage()` to distinguish transport failure from pagination-complete. |
+| `ChatPlatform` | SPI for structured interaction with chat systems. 9 capability accessors (`messaging()`, `threading()`, `discovery()`, `reactions()`, `presence()`, `members()`, `channelManagement()`, `memberManagement()`, `messageHistory()`) assembled via Builder; each returns a native or degraded implementation. |
+| `ChatPlatformService` | CDI service: `platform(id)` returns the `ChatPlatform` for a given platform ID (e.g. `"slack"`, `"discord"`, `"ref"`). |
+| `RichCard` | Platform-agnostic rich content record: title, description, color, fields (label+value pairs), footer, imageUrl, thumbnailUrl. Translated to Block Kit (Slack) or Embed (Discord) per platform. |
+| `Channel` | Chat model record: id, name, topic, description, isPrivate, memberCount. Returned by `Discovery.listChannels()` and `ChannelManagement.findByName()`. |
+| `DiscordClient` | HTTP client for Discord Bot REST API v10. 19 public methods covering messaging, channels, reactions, members, guild info, Gateway URL, and CDN attachment download. |
+| `DiscordGateway` | WebSocket client for Discord Gateway. Receives MESSAGE_CREATE (→ inbound), PRESENCE_UPDATE (→ presence cache), GUILD_MEMBERS_CHUNK. Handles heartbeat, identify, reconnect. |
+| `SlackChatPlatform` | ChatPlatform implementation for Slack — 9/9 capabilities native. Most capable implementation: batch user fetch via `users.list` for member enrichment, full `ts`-precision message history. |
+| `DiscordChatPlatform` | ChatPlatform implementation for Discord — 8/9 capabilities native (MemberManagement degraded). Gateway-driven inbound via `DiscordInboundConnector`. |
+| Graceful degradation | Every ChatPlatform capability has a default implementation that does nothing harmful: `NoOpReactions`, `EmptyDiscovery`, `UnknownPresence`, etc. Callers never null-check capabilities. |
 | IMAP IDLE | RFC 2177 extension — server pushes EXISTS notification when a new message arrives. Used by `EmailInboundConnector` for sub-second inbound latency. |
