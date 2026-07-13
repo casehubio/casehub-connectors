@@ -587,4 +587,11 @@ describe('QhorusWorkbenchElement', () => {
       expect(cssText).toMatch(/qhorus-message-input[^}]*flex-shrink:\s*0/);
     });
   });
+
+  describe('swipe gestures', () => {
+    it('has SwipeController attached', async () => {
+      const el = await renderWorkbench() as any;
+      expect(el._swipeController).toBeDefined();
+    });
+  });
 });

@@ -16,6 +16,7 @@
     "@casehubio/pages-runtime": "file:../../../../../pages/packages/pages-runtime",
     "@casehubio/pages-ui": "file:../../../../../pages/packages/pages-ui",
     "dompurify": "^3.4.11",
+    "emoji-picker-element": "^1.29.1",
     "lit": "^3.3.3",
     "marked": "^15.0.12"
   },

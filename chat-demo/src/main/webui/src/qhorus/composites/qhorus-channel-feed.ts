@@ -1,7 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { QhorusMessage, Reaction, CommitmentState } from '../types.js';
-import { emitChatEvent, ChatEventTopics } from '../events.js';
 import '../primitives/qhorus-message.js';
 import '../primitives/qhorus-thread.js';
 
@@ -16,6 +15,7 @@ export class QhorusChannelFeedElement extends LitElement {
   @property({ type: Array }) messages: QhorusMessage[] = [];
   @property({ type: Array }) reactions: Reaction[] = [];
   @property({ type: Object }) commitments: Map<string, CommitmentState> = new Map();
+  @property({ type: String }) channelName?: string;
 
   @state() private _prevMessageCount = 0;
 
@@ -103,10 +103,6 @@ export class QhorusChannelFeedElement extends LitElement {
     }
   }
 
-  private _selectMessage(msg: QhorusMessage) {
-    emitChatEvent(this, ChatEventTopics.MESSAGE_SELECTED, { message: msg });
-  }
-
   override render() {
     return html`
       <div class="feed">
@@ -125,10 +121,12 @@ export class QhorusChannelFeedElement extends LitElement {
           <span class="group-sender">${group.sender}</span>
         </div>
         ${group.messages.map(msg => html`
-          <div class="message-item" @click=${() => this._selectMessage(msg)}>
+          <div class="message-item">
             <qhorus-message .message=${msg}
                             .reactions=${this._reactionsFor(msg.id)}
-                            .showActorBadge=${group.messages.indexOf(msg) === 0}>
+                            .showActorBadge=${group.messages.indexOf(msg) === 0}
+                            .channelName=${this.channelName}
+                            .parentMessage=${msg.inReplyTo ? this.messages.find(m => m.id === msg.inReplyTo) : undefined}>
             </qhorus-message>
           </div>
           ${repliesByParent.has(msg.id) ? html`

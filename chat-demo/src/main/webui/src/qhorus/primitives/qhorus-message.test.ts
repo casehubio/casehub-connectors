@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import './qhorus-message.js';
 import './qhorus-reaction-bar.js';
 import type { QhorusMessage } from '../types.js';
+import { ChatEventTopics } from '../events.js';
 
 function makeMessage(overrides: Partial<QhorusMessage> = {}): QhorusMessage {
   return {
@@ -26,7 +27,9 @@ async function renderMessage(props: Record<string, unknown> = {}): Promise<HTMLE
   if (props.reactions) el.reactions = props.reactions;
   if (props.showSpeechAct !== undefined) el.showSpeechAct = props.showSpeechAct;
   if (props.showActorBadge !== undefined) el.showActorBadge = props.showActorBadge;
-  if (props.expanded !== undefined) el.expanded = props.expanded;
+  if (props.parentMessage) el.parentMessage = props.parentMessage;
+  if (props.channelName) el.channelName = props.channelName;
+  if (props.commitmentState) el.commitmentState = props.commitmentState;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -187,10 +190,10 @@ describe('qhorus-message', () => {
     expect(reactionBar).toBeTruthy();
   });
 
-  it('does not render reaction bar when reactions is empty', async () => {
+  it('always renders reaction bar even when reactions is empty', async () => {
     const el = await renderMessage({ reactions: [] });
     const reactionBar = el.shadowRoot!.querySelector('qhorus-reaction-bar');
-    expect(reactionBar).toBeNull();
+    expect(reactionBar).toBeTruthy();
   });
 
   it('hides commitment badge when commitmentState is undefined', async () => {
@@ -291,5 +294,149 @@ describe('qhorus-message', () => {
     const time = el.shadowRoot!.querySelector('time');
     expect(time!.textContent).toBe('2d');
     vi.useRealTimers();
+  });
+
+  // --- Progressive Disclosure (#63) ---
+
+  it('renders expand toggle button in header', async () => {
+    const el = await renderMessage();
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle');
+    expect(toggle).toBeTruthy();
+    expect(toggle!.tagName).toBe('BUTTON');
+    expect(toggle!.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('toggles expanded state on toggle button click', async () => {
+    const el = await renderMessage();
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(el.shadowRoot!.querySelector('.expanded-section')).toBeTruthy();
+  });
+
+  it('collapses on second toggle click', async () => {
+    const el = await renderMessage();
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    toggle.click();
+    await (el as any).updateComplete;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(el.shadowRoot!.querySelector('.expanded-section')).toBeNull();
+  });
+
+  it('renders correlation context when expanded with parentMessage', async () => {
+    const parent = makeMessage({ id: 'parent-1', sender: 'bob', content: 'Original question about the deployment' });
+    const el = await renderMessage({
+      message: { inReplyTo: 'parent-1' },
+      parentMessage: parent,
+    });
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    const ctx = el.shadowRoot!.querySelector('.correlation-context');
+    expect(ctx).toBeTruthy();
+    expect(ctx!.textContent).toContain('bob');
+    expect(ctx!.textContent).toContain('Original question about the deploy');
+  });
+
+  it('does not render correlation context when parentMessage not set', async () => {
+    const el = await renderMessage({ message: { inReplyTo: 'parent-1' } });
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    expect(el.shadowRoot!.querySelector('.correlation-context')).toBeNull();
+  });
+
+  it('renders artefact details when expanded with artefactRefs', async () => {
+    const el = await renderMessage({
+      message: {
+        artefactRefs: [
+          { uri: 'doc:spec.md', type: 'DOCUMENT', label: 'Design Spec', scope: { startLine: 10, endLine: 20 } },
+        ],
+      },
+    });
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    const detail = el.shadowRoot!.querySelector('.artefact-detail');
+    expect(detail).toBeTruthy();
+    expect(detail!.textContent).toContain('Design Spec');
+    expect(detail!.textContent).toContain('doc:spec.md');
+  });
+
+  it('renders commitment details when expanded for COMMAND with state', async () => {
+    const el = await renderMessage({
+      message: {
+        messageType: 'COMMAND',
+        commitmentId: 'c-1',
+        deadline: '2026-07-15T12:00:00Z',
+        acknowledgedAt: '2026-07-10T09:00:00Z',
+      },
+      commitmentState: 'ACKNOWLEDGED',
+    });
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    const details = el.shadowRoot!.querySelector('.commitment-details');
+    expect(details).toBeTruthy();
+  });
+
+  it('does not render commitment details for non-COMMAND messages', async () => {
+    const el = await renderMessage({
+      message: { messageType: 'EVENT' },
+      commitmentState: 'OPEN',
+    });
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    expect(el.shadowRoot!.querySelector('.commitment-details')).toBeNull();
+  });
+
+  it('renders topic and channel metadata when expanded', async () => {
+    const el = await renderMessage({
+      message: { topic: 'Deployment' },
+      channelName: 'ops-channel',
+    });
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    const meta = el.shadowRoot!.querySelector('.metadata');
+    expect(meta).toBeTruthy();
+    expect(meta!.textContent).toContain('Deployment');
+    expect(meta!.textContent).toContain('ops-channel');
+  });
+
+  it('renders reply button in expanded action bar', async () => {
+    const el = await renderMessage();
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    const replyBtn = el.shadowRoot!.querySelector('.action-bar .reply-btn');
+    expect(replyBtn).toBeTruthy();
+  });
+
+  it('reply button emits MESSAGE_SELECTED event', async () => {
+    const el = await renderMessage();
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+
+    const handler = vi.fn();
+    el.addEventListener('pages-event', handler);
+    const replyBtn = el.shadowRoot!.querySelector('.reply-btn') as HTMLButtonElement;
+    replyBtn.click();
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler.mock.calls[0][0].detail.topic).toBe('chat:message-selected');
+    expect(handler.mock.calls[0][0].detail.payload.message.id).toBe('msg-1');
+  });
+
+  it('passes messageId to reaction bar', async () => {
+    const el = await renderMessage();
+    const bar = el.shadowRoot!.querySelector('qhorus-reaction-bar') as any;
+    expect(bar).toBeTruthy();
+    expect(bar.messageId).toBe('msg-1');
   });
 });

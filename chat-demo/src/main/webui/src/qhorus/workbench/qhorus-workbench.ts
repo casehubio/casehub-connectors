@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { ChatDemoAdapter } from './chat-demo-adapter.js';
+import { SwipeController } from './swipe-controller.js';
 import { ChatEventTopics } from '../events.js';
 import type { SendMessagePayload, ReactPayload, CreateChannelPayload } from '../events.js';
 import type { QhorusMessage, QhorusChannel, Reaction, ChannelMember, PresenceState } from '../types.js';
@@ -36,6 +37,11 @@ export class QhorusWorkbenchElement extends LitElement {
   @state() private _darkMode = false;
 
   private _adapter = new ChatDemoAdapter();
+  private _swipeController = new SwipeController(this, {
+    drawerQuery: (side) => this.renderRoot?.querySelector(side === 'left' ? '.drawer.left' : '.drawer.right') as HTMLElement | null,
+    backdropQuery: () => this.renderRoot?.querySelector('.backdrop') as HTMLElement | null,
+    onOpen: (side) => { if (side === 'left') this._toggleNav(); else this._toggleMember(); },
+  });
   private _ws?: WebSocket;
   private _reconnectTimeout?: ReturnType<typeof setTimeout>;
   private _mqTablet?: MediaQueryList;
@@ -415,7 +421,8 @@ export class QhorusWorkbenchElement extends LitElement {
     return html`
       <qhorus-channel-feed
         .messages=${this._filteredMessages()}
-        .reactions=${this._filteredReactions()}>
+        .reactions=${this._filteredReactions()}
+        .channelName=${this._channels.find(c => c.id === this._selectedChannelId)?.name}>
       </qhorus-channel-feed>
       <qhorus-message-input
         .channelId=${this._selectedChannelId}

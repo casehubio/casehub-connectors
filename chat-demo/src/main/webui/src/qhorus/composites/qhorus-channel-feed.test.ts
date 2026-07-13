@@ -122,23 +122,44 @@ describe('qhorus-channel-feed', () => {
     expect(groups.length).toBe(2);
   });
 
-  it('emits chat:message-selected event when message clicked', async () => {
+  it('does not emit chat:message-selected on message item click', async () => {
     const el = document.createElement('qhorus-channel-feed') as any;
     el.messages = [msg('m1', { sender: 'alice' })];
     document.body.appendChild(el);
     await el.updateComplete;
 
-    let eventMessage: any;
+    let eventFired = false;
     el.addEventListener('pages-event', (e: any) => {
-      if (e.detail.topic === 'chat:message-selected') {
-        eventMessage = e.detail.payload.message;
-      }
+      if (e.detail.topic === 'chat:message-selected') eventFired = true;
     });
 
     const messageItem = el.shadowRoot!.querySelector('.message-item') as HTMLElement;
     messageItem.click();
+    expect(eventFired).toBe(false);
+  });
 
-    expect(eventMessage.id).toBe('m1');
+  it('passes channelName to qhorus-message elements', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    el.messages = [msg('m1', { sender: 'alice' })];
+    el.channelName = 'general';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const msgEl = el.shadowRoot!.querySelector('qhorus-message') as any;
+    expect(msgEl.channelName).toBe('general');
+  });
+
+  it('passes parentMessage for reply messages in thread', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    const root = msg('root', { sender: 'alice', content: 'Root message' });
+    const reply = msg('reply', { sender: 'bob', inReplyTo: 'root' });
+    el.messages = [root, reply];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const thread = el.shadowRoot!.querySelector('qhorus-thread') as any;
+    expect(thread).toBeTruthy();
+    expect(thread.rootMessage.id).toBe('root');
   });
 
   it('filters reactions per message correctly', async () => {

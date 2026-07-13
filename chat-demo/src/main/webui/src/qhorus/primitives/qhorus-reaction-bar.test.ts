@@ -71,7 +71,7 @@ describe('qhorus-reaction-bar', () => {
     expect(handler.mock.calls[0][0].detail.topic).toBe('chat:unreact');
   });
 
-  it('renders nothing when reactions array is empty', async () => {
+  it('renders add button when reactions array is empty', async () => {
     const el = document.createElement('qhorus-reaction-bar') as any;
     el.reactions = [];
     el.messageId = 'msg-1';
@@ -80,6 +80,8 @@ describe('qhorus-reaction-bar', () => {
 
     const pills = el.shadowRoot!.querySelectorAll('.reaction-pill');
     expect(pills.length).toBe(0);
+    const addBtn = el.shadowRoot!.querySelector('.add-reaction-btn');
+    expect(addBtn).toBeTruthy();
   });
 
   it('does not highlight pills when currentActorId is undefined', async () => {
@@ -125,5 +127,82 @@ describe('qhorus-reaction-bar', () => {
 
     const emoji = handler.mock.calls[0][0].detail.payload.emoji;
     expect(emoji).toBe('🚀');
+  });
+
+  it('renders add button after reaction pills', async () => {
+    const el = document.createElement('qhorus-reaction-bar') as any;
+    el.reactions = makeReactions([['👍', ['a']]]);
+    el.messageId = 'msg-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const pills = el.shadowRoot!.querySelectorAll('.reaction-pill');
+    const addBtn = el.shadowRoot!.querySelector('.add-reaction-btn');
+    expect(pills.length).toBe(1);
+    expect(addBtn).toBeTruthy();
+  });
+
+  it('clicking add button shows emoji picker', async () => {
+    const el = document.createElement('qhorus-reaction-bar') as any;
+    el.reactions = [];
+    el.messageId = 'msg-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const addBtn = el.shadowRoot!.querySelector('.add-reaction-btn') as HTMLButtonElement;
+    addBtn.click();
+    await el.updateComplete;
+
+    const picker = el.shadowRoot!.querySelector('qhorus-emoji-picker');
+    expect(picker).toBeTruthy();
+  });
+
+  it('selecting emoji emits chat:react and closes picker', async () => {
+    const el = document.createElement('qhorus-reaction-bar') as any;
+    el.reactions = [];
+    el.messageId = 'msg-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // Open picker
+    const addBtn = el.shadowRoot!.querySelector('.add-reaction-btn') as HTMLButtonElement;
+    addBtn.click();
+    await el.updateComplete;
+
+    const handler = vi.fn();
+    el.addEventListener('pages-event', handler);
+
+    const picker = el.shadowRoot!.querySelector('qhorus-emoji-picker')!;
+    picker.dispatchEvent(new CustomEvent('emoji-selected', {
+      bubbles: true, composed: true,
+      detail: { emoji: '🎉' },
+    }));
+    await el.updateComplete;
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler.mock.calls[0][0].detail.topic).toBe('chat:react');
+    expect(handler.mock.calls[0][0].detail.payload).toEqual({ messageId: 'msg-1', emoji: '🎉' });
+
+    // Picker should be closed
+    expect(el.shadowRoot!.querySelector('qhorus-emoji-picker')).toBeNull();
+  });
+
+  it('clicking add button while picker is open closes it', async () => {
+    const el = document.createElement('qhorus-reaction-bar') as any;
+    el.reactions = [];
+    el.messageId = 'msg-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const addBtn = el.shadowRoot!.querySelector('.add-reaction-btn') as HTMLButtonElement;
+    // Open
+    addBtn.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('qhorus-emoji-picker')).toBeTruthy();
+
+    // Close
+    addBtn.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('qhorus-emoji-picker')).toBeNull();
   });
 });
