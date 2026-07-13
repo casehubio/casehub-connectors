@@ -155,6 +155,27 @@ describe('qhorus-message-input', () => {
     expect(el.replyTo).toBeUndefined();
   });
 
+  it('textarea has aria-label', async () => {
+    const el = document.createElement('qhorus-message-input') as any;
+    el.channelId = 'ch-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const textarea = el.shadowRoot!.querySelector('textarea')!;
+    expect(textarea.getAttribute('aria-label')).toBe('Message');
+  });
+
+  it('cancel reply button has aria-label', async () => {
+    const el = document.createElement('qhorus-message-input') as any;
+    el.channelId = 'ch-1';
+    el.replyTo = { messageId: 'msg-1', senderName: 'agent-alpha' };
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const cancelButton = el.shadowRoot!.querySelector('.reply-cancel')!;
+    expect(cancelButton.getAttribute('aria-label')).toBe('Cancel reply');
+  });
+
   it('trims content before sending', async () => {
     const el = document.createElement('qhorus-message-input') as any;
     el.channelId = 'ch-1';

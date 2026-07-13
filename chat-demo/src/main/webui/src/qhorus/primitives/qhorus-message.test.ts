@@ -439,4 +439,27 @@ describe('qhorus-message', () => {
     expect(bar).toBeTruthy();
     expect(bar.messageId).toBe('msg-1');
   });
+
+  it('collapses expanded section on Escape key', async () => {
+    const el = await renderMessage();
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    toggle.click();
+    await (el as any).updateComplete;
+    expect(el.shadowRoot!.querySelector('.expanded-section')).toBeTruthy();
+
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await (el as any).updateComplete;
+    expect(el.shadowRoot!.querySelector('.expanded-section')).toBeNull();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('Escape key does nothing when already collapsed', async () => {
+    const el = await renderMessage();
+    const toggle = el.shadowRoot!.querySelector('.expand-toggle') as HTMLButtonElement;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await (el as any).updateComplete;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  });
 });

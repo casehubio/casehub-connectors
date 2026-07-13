@@ -4,6 +4,8 @@ export interface SwipeOptions {
   drawerQuery: (side: 'left' | 'right') => HTMLElement | null;
   backdropQuery: () => HTMLElement | null;
   onOpen: (side: 'left' | 'right') => void;
+  onClose?: (side: 'left' | 'right') => void;
+  isOpenQuery?: (side: 'left' | 'right') => boolean;
   edgeWidth?: number;
   drawerWidth?: number;
   distanceThreshold?: number;
@@ -20,6 +22,7 @@ export class SwipeController implements ReactiveController {
   private _options: Required<SwipeOptions>;
   private _tracking = false;
   private _side: 'left' | 'right' = 'left';
+  private _gesture: 'open' | 'close' = 'open';
   private _startX = 0;
   private _startY = 0;
   private _intentConfirmed = false;
@@ -35,6 +38,8 @@ export class SwipeController implements ReactiveController {
       drawerWidth: 280,
       distanceThreshold: 0.3,
       velocityThreshold: 0.5,
+      onClose: () => {},
+      isOpenQuery: () => false,
       ...options,
     };
     host.addController(this);
@@ -81,15 +86,32 @@ export class SwipeController implements ReactiveController {
   }
 
   private _onPointerDown = (e: PointerEvent) => {
-    const { edgeWidth } = this._options;
+    const { edgeWidth, isOpenQuery } = this._options;
     const w = window.innerWidth;
     let side: 'left' | 'right';
+    let gesture: 'open' | 'close';
 
-    if (e.clientX <= edgeWidth) side = 'left';
-    else if (e.clientX >= w - edgeWidth) side = 'right';
-    else return;
+    if (isOpenQuery('left') && e.clientX <= this._options.drawerWidth) {
+      side = 'left';
+      gesture = 'close';
+    } else if (isOpenQuery('right') && e.clientX >= w - this._options.drawerWidth) {
+      side = 'right';
+      gesture = 'close';
+    } else if (isOpenQuery('left') || isOpenQuery('right')) {
+      side = isOpenQuery('left') ? 'left' : 'right';
+      gesture = 'close';
+    } else if (e.clientX <= edgeWidth) {
+      side = 'left';
+      gesture = 'open';
+    } else if (e.clientX >= w - edgeWidth) {
+      side = 'right';
+      gesture = 'open';
+    } else {
+      return;
+    }
 
     this._side = side;
+    this._gesture = gesture;
     this._startX = e.clientX;
     this._startY = e.clientY;
     this._tracking = true;
@@ -132,16 +154,27 @@ export class SwipeController implements ReactiveController {
     if (!drawer) return;
 
     let delta: number;
-    if (this._side === 'left') {
-      delta = Math.max(0, Math.min(drawerWidth, e.clientX - this._startX));
-      drawer.style.transform = `translateX(calc(-100% + ${delta}px))`;
+    if (this._gesture === 'open') {
+      if (this._side === 'left') {
+        delta = Math.max(0, Math.min(drawerWidth, e.clientX - this._startX));
+        drawer.style.transform = `translateX(calc(-100% + ${delta}px))`;
+      } else {
+        delta = Math.max(0, Math.min(drawerWidth, this._startX - e.clientX));
+        drawer.style.transform = `translateX(calc(100% - ${delta}px))`;
+      }
+      const progress = delta / drawerWidth;
+      if (backdrop) backdrop.style.opacity = String(progress * 0.5);
     } else {
-      delta = Math.max(0, Math.min(drawerWidth, this._startX - e.clientX));
-      drawer.style.transform = `translateX(calc(100% - ${delta}px))`;
+      if (this._side === 'left') {
+        delta = Math.max(0, Math.min(drawerWidth, this._startX - e.clientX));
+        drawer.style.transform = `translateX(-${delta}px)`;
+      } else {
+        delta = Math.max(0, Math.min(drawerWidth, e.clientX - this._startX));
+        drawer.style.transform = `translateX(${delta}px)`;
+      }
+      const progress = 1 - delta / drawerWidth;
+      if (backdrop) backdrop.style.opacity = String(progress * 0.5);
     }
-
-    const progress = delta / drawerWidth;
-    if (backdrop) backdrop.style.opacity = String(progress * 0.5);
   };
 
   private _onPointerUp = (e: PointerEvent) => {
@@ -162,9 +195,16 @@ export class SwipeController implements ReactiveController {
     }
 
     const { drawerWidth, distanceThreshold, velocityThreshold } = this._options;
-    const totalDelta = this._side === 'left'
-      ? e.clientX - this._startX
-      : this._startX - e.clientX;
+    let totalDelta: number;
+    if (this._gesture === 'open') {
+      totalDelta = this._side === 'left'
+        ? e.clientX - this._startX
+        : this._startX - e.clientX;
+    } else {
+      totalDelta = this._side === 'left'
+        ? this._startX - e.clientX
+        : e.clientX - this._startX;
+    }
 
     const distanceMet = totalDelta / drawerWidth > distanceThreshold;
     const velocity = this._computeVelocity(e.timeStamp);
@@ -174,10 +214,12 @@ export class SwipeController implements ReactiveController {
     const backdrop = this._options.backdropQuery();
 
     if (distanceMet || velocityMet) {
-      if (drawer) {
-        drawer.style.transform = 'translateX(0)';
+      if (this._gesture === 'open') {
+        if (drawer) drawer.style.transform = 'translateX(0)';
+        this._options.onOpen(this._side);
+      } else {
+        this._options.onClose(this._side);
       }
-      this._options.onOpen(this._side);
       this._host.updateComplete.then(() => {
         if (drawer) drawer.style.transform = '';
         if (backdrop) backdrop.style.opacity = '';

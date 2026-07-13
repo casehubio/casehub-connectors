@@ -1,9 +1,10 @@
 import { LitElement, html, css } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import 'emoji-picker-element';
 
 @customElement('qhorus-emoji-picker')
 export class QhorusEmojiPickerElement extends LitElement {
+  @property({ type: String }) skinToneEmoji?: string;
   static override readonly styles = css`
     :host {
       display: block;
@@ -35,7 +36,9 @@ export class QhorusEmojiPickerElement extends LitElement {
   };
 
   override render() {
-    return html`<emoji-picker @emoji-click=${this._onEmojiClick}></emoji-picker>`;
+    return html`<emoji-picker
+      skin-tone-emoji=${this.skinToneEmoji ?? '🖐️'}
+      @emoji-click=${this._onEmojiClick}></emoji-picker>`;
   }
 }
 

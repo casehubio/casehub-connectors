@@ -41,6 +41,8 @@ export class QhorusWorkbenchElement extends LitElement {
     drawerQuery: (side) => this.renderRoot?.querySelector(side === 'left' ? '.drawer.left' : '.drawer.right') as HTMLElement | null,
     backdropQuery: () => this.renderRoot?.querySelector('.backdrop') as HTMLElement | null,
     onOpen: (side) => { if (side === 'left') this._toggleNav(); else this._toggleMember(); },
+    onClose: () => { this._drawerOpen = null; },
+    isOpenQuery: (side) => side === 'left' ? this._drawerOpen === 'channel' : this._drawerOpen === 'member',
   });
   private _ws?: WebSocket;
   private _reconnectTimeout?: ReturnType<typeof setTimeout>;

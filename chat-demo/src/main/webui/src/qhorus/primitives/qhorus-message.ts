@@ -175,6 +175,22 @@ export class QhorusMessageElement extends LitElement {
     }
   }
 
+  override connectedCallback() {
+    super.connectedCallback();
+    this.addEventListener('keydown', this._onKeydown);
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this.removeEventListener('keydown', this._onKeydown);
+  }
+
+  private _onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && this._expanded) {
+      this._expanded = false;
+    }
+  };
+
   private _toggle() {
     this._expanded = !this._expanded;
   }

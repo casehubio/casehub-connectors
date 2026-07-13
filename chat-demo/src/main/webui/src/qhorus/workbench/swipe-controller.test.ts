@@ -201,4 +201,127 @@ describe('SwipeController', () => {
     expect(leftDrawer.style.transform).toBe('');
     expect(backdrop.style.opacity).toBe('');
   });
+
+  describe('swipe-to-close', () => {
+    let onClose: ReturnType<typeof vi.fn<(side: 'left' | 'right') => void>>;
+    let closeController: SwipeController;
+
+    beforeEach(() => {
+      onClose = vi.fn();
+      closeController = new SwipeController(mockHost(), {
+        drawerQuery: (side) => side === 'left' ? leftDrawer : rightDrawer,
+        backdropQuery: () => backdrop,
+        onOpen,
+        onClose,
+        isOpenQuery: (side) => side === 'left',
+      });
+    });
+
+    afterEach(() => {
+      closeController.hostDisconnected();
+    });
+
+    it('closes left drawer when swiped left from drawer area', () => {
+      closeController.hostConnected();
+
+      document.body.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: 100, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 80, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 0, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: 0, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+
+      expect(onClose).toHaveBeenCalledWith('left');
+      expect(onOpen).not.toHaveBeenCalled();
+    });
+
+    it('does not close when swipe distance is insufficient', () => {
+      closeController.hostConnected();
+
+      document.body.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: 100, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 85, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 80, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: 80, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('cancels close when vertical movement exceeds horizontal', () => {
+      closeController.hostConnected();
+
+      document.body.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: 100, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 97, clientY: 220, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 0, clientY: 220, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: 0, clientY: 220, pointerId: 1, bubbles: true,
+      }));
+
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('closes right drawer when swiped right', () => {
+      const rightOpenController = new SwipeController(mockHost(), {
+        drawerQuery: (side) => side === 'left' ? leftDrawer : rightDrawer,
+        backdropQuery: () => backdrop,
+        onOpen,
+        onClose,
+        isOpenQuery: (side) => side === 'right',
+      });
+      rightOpenController.hostConnected();
+      const w = window.innerWidth;
+
+      document.body.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: w - 100, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: w - 80, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: w, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: w, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+
+      expect(onClose).toHaveBeenCalledWith('right');
+      rightOpenController.hostDisconnected();
+    });
+
+    it('prefers close gesture over edge open when drawer is already open', () => {
+      closeController.hostConnected();
+
+      document.body.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: 5, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 100, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+      document.body.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: 100, clientY: 200, pointerId: 1, bubbles: true,
+      }));
+
+      // Edge swipe should not re-trigger open when drawer is already open
+      expect(onOpen).not.toHaveBeenCalled();
+    });
+  });
 });

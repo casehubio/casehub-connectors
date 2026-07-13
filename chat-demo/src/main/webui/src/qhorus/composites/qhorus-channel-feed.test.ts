@@ -169,9 +169,9 @@ describe('qhorus-channel-feed', () => {
       msg('m2', { sender: 'bob' }),
     ];
     el.reactions = [
-      { messageId: 'm1', emoji: '👍', users: ['user1'] },
-      { messageId: 'm1', emoji: '❤️', users: ['user2'] },
-      { messageId: 'm2', emoji: '🔥', users: ['user3'] },
+      { messageId: 'm1', emoji: '👍', actorId: 'user1', createdAt: '2026-07-07T12:00:00Z' },
+      { messageId: 'm1', emoji: '❤️', actorId: 'user2', createdAt: '2026-07-07T12:00:00Z' },
+      { messageId: 'm2', emoji: '🔥', actorId: 'user3', createdAt: '2026-07-07T12:00:00Z' },
     ];
     document.body.appendChild(el);
     await el.updateComplete;
@@ -180,5 +180,83 @@ describe('qhorus-channel-feed', () => {
     expect(messages.length).toBe(2);
     expect((messages[0] as any).reactions.length).toBe(2);
     expect((messages[1] as any).reactions.length).toBe(1);
+  });
+
+  it('passes empty reactions array for messages with no reactions', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    el.messages = [
+      msg('m1', { sender: 'alice' }),
+      msg('m2', { sender: 'bob' }),
+    ];
+    el.reactions = [
+      { messageId: 'm1', emoji: '👍', actorId: 'user1', createdAt: '2026-07-07T12:00:00Z' },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const messages = el.shadowRoot!.querySelectorAll('qhorus-message');
+    expect((messages[0] as any).reactions.length).toBe(1);
+    expect((messages[1] as any).reactions).toEqual([]);
+  });
+
+  it('promotes orphaned replies to roots when parent is missing', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    el.messages = [
+      msg('m1', { sender: 'alice' }),
+      msg('orphan', { sender: 'bob', inReplyTo: 'deleted-parent' }),
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const messages = el.shadowRoot!.querySelectorAll('qhorus-message');
+    expect(messages.length).toBe(2);
+  });
+
+  it('does not create thread for orphaned reply', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    el.messages = [
+      msg('m1', { sender: 'alice' }),
+      msg('orphan', { sender: 'bob', inReplyTo: 'deleted-parent' }),
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const threads = el.shadowRoot!.querySelectorAll('qhorus-thread');
+    expect(threads.length).toBe(0);
+  });
+
+  it('feed container has aria-live="polite"', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    el.messages = [msg('1')];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const feed = el.shadowRoot!.querySelector('.feed');
+    expect(feed!.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('feed container has role="log"', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    el.messages = [msg('1')];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const feed = el.shadowRoot!.querySelector('.feed');
+    expect(feed!.getAttribute('role')).toBe('log');
+  });
+
+  it('ignores reactions referencing messages not in the list', async () => {
+    const el = document.createElement('qhorus-channel-feed') as any;
+    el.messages = [msg('m1', { sender: 'alice' })];
+    el.reactions = [
+      { messageId: 'm1', emoji: '👍', actorId: 'user1', createdAt: '2026-07-07T12:00:00Z' },
+      { messageId: 'nonexistent', emoji: '🔥', actorId: 'user2', createdAt: '2026-07-07T12:00:00Z' },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const messages = el.shadowRoot!.querySelectorAll('qhorus-message');
+    expect(messages.length).toBe(1);
+    expect((messages[0] as any).reactions.length).toBe(1);
   });
 });

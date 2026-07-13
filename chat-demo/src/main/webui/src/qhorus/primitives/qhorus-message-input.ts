@@ -101,10 +101,11 @@ export class QhorusMessageInputElement extends LitElement {
       ${this.replyTo ? html`
         <div class="reply-banner">
           <span>Replying to <strong>${this.replyTo.senderName}</strong></span>
-          <button class="reply-cancel" @click=${this._cancelReply}>✕</button>
+          <button class="reply-cancel" aria-label="Cancel reply" @click=${this._cancelReply}>✕</button>
         </div>
       ` : nothing}
       <textarea
+        aria-label="Message"
         placeholder="Type a message..."
         @keydown=${this._handleKeydown}
         @input=${this._handleInput}

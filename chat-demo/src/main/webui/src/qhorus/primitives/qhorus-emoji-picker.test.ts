@@ -30,6 +30,23 @@ describe('qhorus-emoji-picker', () => {
     expect(handler.mock.calls[0][0].detail.emoji).toBe('😀');
   });
 
+  it('passes skinToneEmoji attribute to inner picker', async () => {
+    const el = document.createElement('qhorus-emoji-picker') as any;
+    el.skinToneEmoji = '👍';
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const picker = el.shadowRoot!.querySelector('emoji-picker') as any;
+    expect(picker.getAttribute('skin-tone-emoji')).toBe('👍');
+  });
+
+  it('does not override dataSource (preserves IndexedDB favorites persistence)', async () => {
+    const el = document.createElement('qhorus-emoji-picker') as any;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const picker = el.shadowRoot!.querySelector('emoji-picker') as any;
+    expect(picker.getAttribute('data-source')).toBeNull();
+  });
+
   it('does not emit when emoji-click has no unicode', async () => {
     const el = document.createElement('qhorus-emoji-picker') as any;
     document.body.appendChild(el);

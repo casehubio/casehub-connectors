@@ -55,19 +55,16 @@ export class QhorusChannelFeedElement extends LitElement {
     }
   `;
 
-  private _reactionsFor(messageId: string): Reaction[] {
-    return this.reactions.filter(r => r.messageId === messageId);
-  }
-
   _separateRootsAndReplies(): {
     roots: QhorusMessage[];
     repliesByParent: Map<string, QhorusMessage[]>;
   } {
+    const messageIds = new Set(this.messages.map(m => m.id));
     const repliesByParent = new Map<string, QhorusMessage[]>();
     const roots: QhorusMessage[] = [];
 
     for (const m of this.messages) {
-      if (m.inReplyTo) {
+      if (m.inReplyTo && messageIds.has(m.inReplyTo)) {
         const list = repliesByParent.get(m.inReplyTo) ?? [];
         list.push(m);
         repliesByParent.set(m.inReplyTo, list);
@@ -105,7 +102,7 @@ export class QhorusChannelFeedElement extends LitElement {
 
   override render() {
     return html`
-      <div class="feed">
+      <div class="feed" role="log" aria-live="polite">
         ${this.messages.length === 0 ? html`
           <div class="empty">No messages yet</div>
         ` : this._renderFeed()}
@@ -113,8 +110,19 @@ export class QhorusChannelFeedElement extends LitElement {
     `;
   }
 
+  private _buildReactionIndex(): Map<string, Reaction[]> {
+    const index = new Map<string, Reaction[]>();
+    for (const r of this.reactions) {
+      const list = index.get(r.messageId);
+      if (list) list.push(r);
+      else index.set(r.messageId, [r]);
+    }
+    return index;
+  }
+
   private _renderFeed() {
     const { roots, repliesByParent } = this._separateRootsAndReplies();
+    const reactionIndex = this._buildReactionIndex();
     return this._groupFlat(roots).map(group => html`
       <div class="message-group">
         <div class="message-group-header">
@@ -123,7 +131,7 @@ export class QhorusChannelFeedElement extends LitElement {
         ${group.messages.map(msg => html`
           <div class="message-item">
             <qhorus-message .message=${msg}
-                            .reactions=${this._reactionsFor(msg.id)}
+                            .reactions=${reactionIndex.get(msg.id) ?? []}
                             .showActorBadge=${group.messages.indexOf(msg) === 0}
                             .channelName=${this.channelName}
                             .parentMessage=${msg.inReplyTo ? this.messages.find(m => m.id === msg.inReplyTo) : undefined}>
