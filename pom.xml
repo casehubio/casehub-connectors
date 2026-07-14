@@ -60,14 +60,7 @@ Zero heavy dependencies — HTTP-based connectors use java.net.http only.</descr
     </repository>
   </repositories>
 
-  <profiles>
-    <profile>
-      <id>demo</id>
-      <modules>
-        <module>chat-demo</module>
-      </modules>
-    </profile>
-  </profiles>
+
 
   <distributionManagement>
     <repository>
