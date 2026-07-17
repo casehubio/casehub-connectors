@@ -1,24 +1,25 @@
 package io.casehub.connectors.chat.discord;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.assertj.core.api.Assertions.*;
-
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import io.casehub.connectors.InboundMessage;
+import io.casehub.connectors.discord.DiscordClient;
+import io.casehub.connectors.discord.DiscordGatewayPresenceCache;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.casehub.connectors.InboundMessage;
-import io.casehub.connectors.discord.DiscordClient;
-import io.casehub.connectors.discord.DiscordGatewayPresenceCache;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class DiscordInboundConnectorTest {
 
@@ -35,12 +36,12 @@ class DiscordInboundConnectorTest {
 
         final DiscordClient client = new DiscordClient();
         setField(client, "apiBaseUrl", wireMock.baseUrl());
-        setField(client, "guildId", "guild1");
         setField(client, "maxAttachmentBytes", 8_388_608L);
+        setField(client, "allowedCdnHostsConfig", "localhost");
         setField(client, "allowedCdnHosts", Set.of("localhost"));
 
         connector = new DiscordInboundConnector(
-                client, new DiscordGatewayPresenceCache(), "test-token", "guild1");
+                client, new DiscordGatewayPresenceCache(), "test-token");
         received = new CopyOnWriteArrayList<>();
     }
 
@@ -142,6 +143,42 @@ class DiscordInboundConnectorTest {
         Thread.sleep(200);
         assertThat(received).isEmpty();
     }
+
+    @Test
+    void messageWithGuildId_extractedFromEventData() throws Exception {
+        final JsonNode data = MAPPER.readTree("""
+                                              {"id":"msg1","channel_id":"ch1","content":"hello",
+                                               "guild_id":"guild-from-event",
+                                               "type":0,"author":{"id":"u1","username":"user1","bot":false},
+                                               "attachments":[]}
+                                              """);
+
+        connector.handleEvent("MESSAGE_CREATE", data, received::add);
+
+        Awaitility.await().atMost(2, TimeUnit.SECONDS)
+                  .until(() -> !received.isEmpty());
+
+        assertThat(received.get(0).metadata().get("discord-guild-id"))
+                .isEqualTo("guild-from-event");
+    }
+
+    @Test
+    void messageWithoutGuildId_setsUnknown() throws Exception {
+        final JsonNode data = MAPPER.readTree("""
+                                              {"id":"msg1","channel_id":"ch1","content":"dm",
+                                               "type":0,"author":{"id":"u1","username":"user1","bot":false},
+                                               "attachments":[]}
+                                              """);
+
+        connector.handleEvent("MESSAGE_CREATE", data, received::add);
+
+        Awaitility.await().atMost(2, TimeUnit.SECONDS)
+                  .until(() -> !received.isEmpty());
+
+        assertThat(received.get(0).metadata().get("discord-guild-id"))
+                .isEqualTo("unknown");
+    }
+
 
     private static void setField(final Object target, final String fieldName,
                                   final Object value) throws Exception {

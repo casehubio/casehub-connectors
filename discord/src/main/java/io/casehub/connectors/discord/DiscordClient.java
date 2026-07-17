@@ -1,5 +1,24 @@
 package io.casehub.connectors.discord;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.casehub.connectors.Attachment;
+import io.casehub.connectors.discord.model.DiscordAttachment;
+import io.casehub.connectors.discord.model.DiscordChannel;
+import io.casehub.connectors.discord.model.DiscordEmbed;
+import io.casehub.connectors.discord.model.DiscordGuild;
+import io.casehub.connectors.discord.model.DiscordMember;
+import io.casehub.connectors.discord.model.DiscordMessage;
+import io.casehub.connectors.discord.model.DiscordUser;
+import io.casehub.connectors.discord.model.PermissionOverwrite;
+import io.casehub.connectors.discord.model.PostResult;
+import io.casehub.connectors.http.HttpHelper;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.URI;
@@ -13,20 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
-
-import jakarta.enterprise.context.ApplicationScoped;
-
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
-import io.casehub.connectors.Attachment;
-import io.casehub.connectors.discord.model.*;
-import io.casehub.connectors.http.HttpHelper;
 
 /**
  * Pure-HTTP client for the Discord Bot REST API v10.
@@ -47,8 +52,11 @@ public class DiscordClient {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final int MAX_PAGES = 50;
     private static final long VIEW_CHANNEL_PERMISSION = 1024L; // 1 << 10
-    Set<String> allowedCdnHosts = Set.of(
-            "cdn.discordapp.com", "media.discordapp.net");
+    @ConfigProperty(name = "casehub.discord.attachment.allowed-cdn-hosts",
+                    defaultValue = "cdn.discordapp.com,media.discordapp.net")
+    String allowedCdnHostsConfig;
+
+    Set<String> allowedCdnHosts;
 
     private final ObjectMapper mapper;
 
@@ -56,12 +64,15 @@ public class DiscordClient {
                     defaultValue = "https://discord.com/api/v10")
     String apiBaseUrl;
 
-    @ConfigProperty(name = "casehub.discord.guild-id", defaultValue = "")
-    String guildId;
-
     @ConfigProperty(name = "casehub.discord.attachment.max-bytes",
                     defaultValue = "8388608")
     long maxAttachmentBytes;
+
+    @jakarta.annotation.PostConstruct
+    void init() {
+        this.allowedCdnHosts = Set.of(allowedCdnHostsConfig.split(","));
+    }
+
 
     public DiscordClient() {
         this.mapper = new ObjectMapper();
@@ -215,17 +226,18 @@ public class DiscordClient {
     /**
      * Lists all channels in the guild.
      *
-     * @param token bot token
+     * @param token   bot token
+     * @param guildId Discord guild ID (snowflake)
      * @return list of guild channels
      */
-    public List<DiscordChannel> listGuildChannels(final String token) {
+    public List<DiscordChannel> listGuildChannels(final String token, final String guildId) {
         try {
             final HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/channels"))
-                    .header("Authorization", "Bot " + token)
-                    .timeout(REQUEST_TIMEOUT)
-                    .GET()
-                    .build();
+                                                   .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/channels"))
+                                                   .header("Authorization", "Bot " + token)
+                                                   .timeout(REQUEST_TIMEOUT)
+                                                   .GET()
+                                                   .build();
 
             final HttpResponse<String> response =
                     HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -235,10 +247,10 @@ public class DiscordClient {
                 return List.of();
             }
 
-            final ArrayNode channels = (ArrayNode) mapper.readTree(response.body());
-            final List<DiscordChannel> result = new ArrayList<>();
+            final ArrayNode            channels = (ArrayNode) mapper.readTree(response.body());
+            final List<DiscordChannel> result   = new ArrayList<>();
             for (final JsonNode ch : channels) {
-                result.add(parseChannel(ch));
+                result.add(parseChannel(ch, guildId));
             }
             return result;
 
@@ -288,6 +300,7 @@ public class DiscordClient {
      * Creates a new channel in the guild.
      *
      * @param token     bot token
+     * @param guildId   Discord guild ID (snowflake)
      * @param name      channel name
      * @param topic     channel topic
      * @param type      channel type (0 = GUILD_TEXT)
@@ -295,8 +308,9 @@ public class DiscordClient {
      * @param isPrivate whether to deny @everyone VIEW_CHANNEL
      * @return created channel, or null on error
      */
-    public DiscordChannel createChannel(final String token, final String name, final String topic,
-                                        final int type, final boolean nsfw, final boolean isPrivate) {
+    public DiscordChannel createChannel(final String token, final String guildId, final String name,
+                                        final String topic, final int type, final boolean nsfw,
+                                        final boolean isPrivate) {
         try {
             final ObjectNode body = mapper.createObjectNode();
             body.put("name", name);
@@ -305,8 +319,8 @@ public class DiscordClient {
             body.put("nsfw", nsfw);
 
             if (isPrivate) {
-                final ArrayNode overwrites = mapper.createArrayNode();
-                final ObjectNode overwrite = mapper.createObjectNode();
+                final ArrayNode  overwrites = mapper.createArrayNode();
+                final ObjectNode overwrite  = mapper.createObjectNode();
                 overwrite.put("id", guildId);
                 overwrite.put("type", 0); // role
                 overwrite.put("deny", String.valueOf(VIEW_CHANNEL_PERMISSION));
@@ -315,12 +329,12 @@ public class DiscordClient {
             }
 
             final HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/channels"))
-                    .header("Authorization", "Bot " + token)
-                    .header("Content-Type", "application/json")
-                    .timeout(REQUEST_TIMEOUT)
-                    .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
-                    .build();
+                                                   .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/channels"))
+                                                   .header("Authorization", "Bot " + token)
+                                                   .header("Content-Type", "application/json")
+                                                   .timeout(REQUEST_TIMEOUT)
+                                                   .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+                                                   .build();
 
             final HttpResponse<String> response =
                     HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -330,7 +344,7 @@ public class DiscordClient {
                 return null;
             }
 
-            return parseChannel(mapper.readTree(response.body()));
+            return parseChannel(mapper.readTree(response.body()), guildId);
 
         } catch (final Exception e) {
             LOG.warning("DiscordClient: createChannel error — " + e.getMessage());
@@ -484,27 +498,29 @@ public class DiscordClient {
      * the partial result accumulated so far is returned rather than an empty list.
      *
      * @param token       bot token
+     * @param guildId     Discord guild ID (snowflake)
      * @param limit       max members per page (1-1000)
      * @param afterUserId snowflake ID to fetch members after (for pagination), or null
      * @return list of members; empty if the first request fails
      */
-    public List<DiscordMember> listGuildMembers(final String token, final int limit, final String afterUserId) {
-        final List<DiscordMember> accumulated = new ArrayList<>();
-        String currentAfterId = afterUserId;
-        int pageNum = 0;
+    public List<DiscordMember> listGuildMembers(final String token, final String guildId,
+                                                final int limit, final String afterUserId) {
+        final List<DiscordMember> accumulated    = new ArrayList<>();
+        String                    currentAfterId = afterUserId;
+        int                       pageNum        = 0;
 
         while (pageNum < MAX_PAGES) {
             final String query = currentAfterId == null
-                    ? "?limit=" + limit
-                    : "?limit=" + limit + "&after=" + URLEncoder.encode(currentAfterId, StandardCharsets.UTF_8);
+                                 ? "?limit=" + limit
+                                 : "?limit=" + limit + "&after=" + URLEncoder.encode(currentAfterId, StandardCharsets.UTF_8);
 
             try {
                 final HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/members" + query))
-                        .header("Authorization", "Bot " + token)
-                        .timeout(REQUEST_TIMEOUT)
-                        .GET()
-                        .build();
+                                                       .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/members" + query))
+                                                       .header("Authorization", "Bot " + token)
+                                                       .timeout(REQUEST_TIMEOUT)
+                                                       .GET()
+                                                       .build();
 
                 final HttpResponse<String> response =
                         HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -548,18 +564,19 @@ public class DiscordClient {
     /**
      * Fetches a single guild member by user ID.
      *
-     * @param token  bot token
-     * @param userId Discord user ID
+     * @param token   bot token
+     * @param guildId Discord guild ID (snowflake)
+     * @param userId  Discord user ID
      * @return member details, or null on error or 404
      */
-    public DiscordMember getGuildMember(final String token, final String userId) {
+    public DiscordMember getGuildMember(final String token, final String guildId, final String userId) {
         try {
             final HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/members/" + userId))
-                    .header("Authorization", "Bot " + token)
-                    .timeout(REQUEST_TIMEOUT)
-                    .GET()
-                    .build();
+                                                   .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + "/members/" + userId))
+                                                   .header("Authorization", "Bot " + token)
+                                                   .timeout(REQUEST_TIMEOUT)
+                                                   .GET()
+                                                   .build();
 
             final HttpResponse<String> response =
                     HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -585,18 +602,19 @@ public class DiscordClient {
      * Fetches the guild details.
      *
      * @param token      bot token
+     * @param guildId    Discord guild ID (snowflake)
      * @param withCounts whether to include approximate member counts
      * @return guild details, or null on error
      */
-    public DiscordGuild getGuild(final String token, final boolean withCounts) {
+    public DiscordGuild getGuild(final String token, final String guildId, final boolean withCounts) {
         try {
             final String query = withCounts ? "?with_counts=true" : "";
             final HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + query))
-                    .header("Authorization", "Bot " + token)
-                    .timeout(REQUEST_TIMEOUT)
-                    .GET()
-                    .build();
+                                                   .uri(URI.create(apiBaseUrl + "/guilds/" + guildId + query))
+                                                   .header("Authorization", "Bot " + token)
+                                                   .timeout(REQUEST_TIMEOUT)
+                                                   .GET()
+                                                   .build();
 
             final HttpResponse<String> response =
                     HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -651,9 +669,85 @@ public class DiscordClient {
         }
     }
 
-    public String guildId() {
-        return guildId;
+    /**
+     * Lists all guilds the bot is a member of.
+     *
+     * <p>Paginates using cursor-based pagination ({@code after} parameter, 200 per page,
+     * {@value MAX_PAGES} page cap). Returns {@code null} on first-page failure (matching
+     * {@link #getGuild} error pattern), empty list for a valid response with zero guilds,
+     * partial list on mid-page error (matching {@link #listGuildMembers} fail-soft pattern).
+     *
+     * @param token bot token
+     * @return list of guilds, or {@code null} on first-page failure
+     */
+    public List<DiscordGuild> listBotGuilds(final String token) {
+        final List<DiscordGuild> accumulated = new ArrayList<>();
+        String                   afterId     = null;
+        int                      pageNum     = 0;
+
+        while (pageNum < MAX_PAGES) {
+            final String query = afterId == null
+                                 ? "?limit=200"
+                                 : "?limit=200&after=" + URLEncoder.encode(afterId, StandardCharsets.UTF_8);
+
+            try {
+                final HttpRequest request = HttpRequest.newBuilder()
+                                                       .uri(URI.create(apiBaseUrl + "/users/@me/guilds" + query))
+                                                       .header("Authorization", "Bot " + token)
+                                                       .timeout(REQUEST_TIMEOUT)
+                                                       .GET()
+                                                       .build();
+
+                final HttpResponse<String> response =
+                        HttpHelper.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+                if (response.statusCode() != 200) {
+                    if (pageNum == 0) {
+                        LOG.warning("DiscordClient: listBotGuilds HTTP " + response.statusCode());
+                        return null;
+                    }
+                    LOG.warning(String.format(
+                            "DiscordClient: listBotGuilds stopped after %d page(s) — returned %d guilds: HTTP %d",
+                            pageNum, accumulated.size(), response.statusCode()));
+                    return List.copyOf(accumulated);
+                }
+
+                final ArrayNode guilds = (ArrayNode) mapper.readTree(response.body());
+                if (guilds.isEmpty()) {
+                    break;
+                }
+
+                for (final JsonNode guildNode : guilds) {
+                    accumulated.add(new DiscordGuild(
+                            guildNode.get("id").asText(),
+                            guildNode.get("name").asText(),
+                            null));
+                }
+
+                pageNum++;
+                afterId = guilds.get(guilds.size() - 1).get("id").asText();
+
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.warning(String.format(
+                        "DiscordClient: listBotGuilds interrupted after %d page(s) — returned %d guilds",
+                        pageNum, accumulated.size()));
+                return pageNum == 0 ? null : List.copyOf(accumulated);
+            } catch (final Exception e) {
+                if (pageNum == 0) {
+                    LOG.warning("DiscordClient: listBotGuilds error — " + e.getMessage());
+                    return null;
+                }
+                LOG.warning(String.format(
+                        "DiscordClient: listBotGuilds error after %d page(s) — returned %d guilds: %s",
+                        pageNum, accumulated.size(), e.getMessage()));
+                return List.copyOf(accumulated);
+            }
+        }
+
+        return List.copyOf(accumulated);
     }
+
 
     private ObjectNode buildMessageBody(final String content,
                                         final List<DiscordEmbed> embeds) {
@@ -875,6 +969,11 @@ public class DiscordClient {
     }
 
     private DiscordChannel parseChannel(final JsonNode node) {
+        return parseChannel(node, node.has("guild_id") && !node.get("guild_id").isNull()
+                                  ? node.get("guild_id").asText() : null);
+    }
+
+    private DiscordChannel parseChannel(final JsonNode node, final String guildId) {
         final List<PermissionOverwrite> overwrites = new ArrayList<>();
         if (node.has("permission_overwrites") && !node.get("permission_overwrites").isNull()) {
             for (final JsonNode ow : node.get("permission_overwrites")) {
@@ -889,6 +988,7 @@ public class DiscordClient {
 
         return new DiscordChannel(
                 node.get("id").asText(),
+                guildId,
                 node.has("name") ? node.get("name").asText() : "",
                 node.has("topic") && !node.get("topic").isNull() ? node.get("topic").asText() : null,
                 node.get("type").asInt(),
@@ -931,3 +1031,4 @@ public class DiscordClient {
         }
     }
 }
+

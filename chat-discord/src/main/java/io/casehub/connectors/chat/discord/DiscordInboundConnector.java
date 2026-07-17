@@ -40,7 +40,6 @@ public class DiscordInboundConnector implements InboundConnector {
     private final DiscordClient client;
     private final DiscordGatewayPresenceCache presenceCache;
     private final String token;
-    private final String guildId;
 
     private volatile DiscordGateway gateway;
     private volatile boolean stopping = false;
@@ -50,13 +49,10 @@ public class DiscordInboundConnector implements InboundConnector {
             final DiscordClient client,
             final DiscordGatewayPresenceCache presenceCache,
             @ConfigProperty(name = "casehub.discord.token", defaultValue = "")
-            final String token,
-            @ConfigProperty(name = "casehub.discord.guild-id", defaultValue = "")
-            final String guildId) {
+            final String token) {
         this.client = client;
         this.presenceCache = presenceCache;
         this.token = token;
-        this.guildId = guildId;
     }
 
     @Override
@@ -66,8 +62,8 @@ public class DiscordInboundConnector implements InboundConnector {
 
     @Override
     public void start(final InboundMessageSink sink) {
-        if (token.isBlank() || guildId.isBlank()) {
-            LOG.warning("discord-inbound: token or guild-id not configured, connector inactive");
+        if (token.isBlank()) {
+            LOG.warning("discord-inbound: token not configured, connector inactive");
             return;
         }
 
@@ -181,7 +177,8 @@ public class DiscordInboundConnector implements InboundConnector {
 
         final Map<String, String> metadata = new java.util.HashMap<>();
         metadata.put("discord-message-id", messageId);
-        metadata.put("discord-guild-id", guildId);
+        final String eventGuildId = data.has("guild_id") ? data.get("guild_id").asText() : "unknown";
+        metadata.put("discord-guild-id", eventGuildId);
 
         if (type == 19 && data.has("message_reference")) {
             final JsonNode ref = data.get("message_reference");

@@ -2,6 +2,7 @@ package io.casehub.connectors.chat.discord;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
@@ -69,9 +70,9 @@ class DiscordChatPlatformTest {
         apiBaseUrlField.setAccessible(true);
         apiBaseUrlField.set(client, "http://localhost:" + wireMock.port());
 
-        var guildIdField = DiscordClient.class.getDeclaredField("guildId");
-        guildIdField.setAccessible(true);
-        guildIdField.set(client, "test-guild-123");
+        var allowedCdnHostsConfigField = DiscordClient.class.getDeclaredField("allowedCdnHostsConfig");
+        allowedCdnHostsConfigField.setAccessible(true);
+        allowedCdnHostsConfigField.set(client, "cdn.discordapp.com,media.discordapp.net,localhost");
 
         var allowedCdnHostsField = DiscordClient.class.getDeclaredField("allowedCdnHosts");
         allowedCdnHostsField.setAccessible(true);
@@ -81,9 +82,17 @@ class DiscordChatPlatformTest {
         maxAttachmentBytesField.setAccessible(true);
         maxAttachmentBytesField.set(client, 8388608L); // 8 MB
 
+        // Stub guild discovery for single-guild default
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                .willReturn(okJson("[{\"id\":\"test-guild-123\",\"name\":\"Test Guild\"}]")));
+        wireMock.stubFor(get(urlMatching("/users/@me/guilds\\?limit=200&after=.*"))
+                .willReturn(okJson("[]")));
+        wireMock.stubFor(get(urlEqualTo("/guilds/test-guild-123?with_counts=true"))
+                .willReturn(okJson("{\"id\":\"test-guild-123\",\"name\":\"Test Guild\",\"approximate_member_count\":42}")));
+
         presenceCache = new DiscordGatewayPresenceCache();
-        platform = new DiscordChatPlatform(client, presenceCache, "test-token", "test-guild-123");
-        platform.init(); // Manually call @PostConstruct since we're not using CDI
+        platform = new DiscordChatPlatform(client, presenceCache, "test-token");
+        platform.init();
     }
 
     @Test
@@ -218,14 +227,11 @@ class DiscordChatPlatformTest {
                                   {"id": "ch-forum", "name": "forum", "topic": "", "type": 15}
                                 ]
                                 """)));
-        wireMock.stubFor(get(urlEqualTo("/guilds/test-guild-123?with_counts=true"))
-                .willReturn(okJson("{\"id\":\"test-guild-123\",\"name\":\"Test Guild\",\"approximate_member_count\":10}")));
-
         List<Channel> channels = platform.discovery().listChannels();
 
         assertThat(channels).hasSize(1);
         assertThat(channels.get(0).name()).isEqualTo("general");
-        assertThat(channels.get(0).memberCount()).isEqualTo(10);
+        assertThat(channels.get(0).memberCount()).isEqualTo(42);
     }
 
     @Test
@@ -388,6 +394,7 @@ class DiscordChatPlatformTest {
                         .withBody("""
                                 {
                                   "id": "priv-ch-456",
+                                  "guild_id": "test-guild-123",
                                   "name": "private-channel",
                                   "topic": "Secret",
                                   "type": 0,
@@ -469,7 +476,7 @@ class DiscordChatPlatformTest {
 
     @Test
     void messaging_blankTokenReturnsFailure() throws Exception {
-        DiscordChatPlatform blankPlatform = new DiscordChatPlatform(client, presenceCache, "", "test-guild-123");
+        DiscordChatPlatform blankPlatform = new DiscordChatPlatform(client, presenceCache, "");
         blankPlatform.init();
 
         ChatChannelRef channel = new ChatChannelRef("chan-123");
@@ -482,13 +489,73 @@ class DiscordChatPlatformTest {
     }
 
     @Test
-    void discovery_blankGuildIdReturnsEmpty() throws Exception {
-        DiscordChatPlatform blankPlatform = new DiscordChatPlatform(client, presenceCache, "test-token", "");
-        blankPlatform.init();
+    void init_nullFromListBotGuilds_degradedMode() throws Exception {
+        wireMock.resetAll();
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                .willReturn(aResponse().withStatus(401)));
 
-        List<Channel> channels = blankPlatform.discovery().listChannels();
+        final var failPlatform = new DiscordChatPlatform(client, presenceCache, "test-token");
+        failPlatform.init();
 
-        assertThat(channels).isEmpty();
+        assertThat(failPlatform.supports(Messaging.class)).isFalse();
+        assertThat(failPlatform.discovery().listChannels()).isEmpty();
+    }
+
+    @Test
+    void init_emptyGuildList_degradedMode() throws Exception {
+        wireMock.resetAll();
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                .willReturn(okJson("[]")));
+
+        final var emptyPlatform = new DiscordChatPlatform(client, presenceCache, "test-token");
+        emptyPlatform.init();
+
+        assertThat(emptyPlatform.supports(Messaging.class)).isFalse();
+    }
+
+    @Test
+    void channelManagement_createThrowsOnMultiGuild() throws Exception {
+        wireMock.resetAll();
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                .willReturn(okJson("[{\"id\":\"g1\",\"name\":\"G1\"},{\"id\":\"g2\",\"name\":\"G2\"}]")));
+        wireMock.stubFor(get(urlMatching("/users/@me/guilds\\?limit=200&after=.*"))
+                .willReturn(okJson("[]")));
+        wireMock.stubFor(get(urlEqualTo("/guilds/g1?with_counts=true"))
+                .willReturn(okJson("{\"id\":\"g1\",\"name\":\"G1\",\"approximate_member_count\":5}")));
+        wireMock.stubFor(get(urlEqualTo("/guilds/g2?with_counts=true"))
+                .willReturn(okJson("{\"id\":\"g2\",\"name\":\"G2\",\"approximate_member_count\":3}")));
+
+        final var multiPlatform = new DiscordChatPlatform(client, presenceCache, "test-token");
+        multiPlatform.init();
+
+        assertThatThrownBy(() ->
+                multiPlatform.channelManagement().create("test", "topic", null, false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Multiple guilds");
+    }
+
+    @Test
+    void discovery_multiGuild_aggregatesChannels() throws Exception {
+        wireMock.resetAll();
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                .willReturn(okJson("[{\"id\":\"g1\",\"name\":\"Guild 1\"},{\"id\":\"g2\",\"name\":\"Guild 2\"}]")));
+        wireMock.stubFor(get(urlMatching("/users/@me/guilds\\?limit=200&after=.*"))
+                .willReturn(okJson("[]")));
+        wireMock.stubFor(get(urlEqualTo("/guilds/g1?with_counts=true"))
+                .willReturn(okJson("{\"id\":\"g1\",\"name\":\"Guild 1\",\"approximate_member_count\":10}")));
+        wireMock.stubFor(get(urlEqualTo("/guilds/g2?with_counts=true"))
+                .willReturn(okJson("{\"id\":\"g2\",\"name\":\"Guild 2\",\"approximate_member_count\":20}")));
+        wireMock.stubFor(get(urlEqualTo("/guilds/g1/channels"))
+                .willReturn(okJson("[{\"id\":\"ch-g1\",\"name\":\"general\",\"type\":0}]")));
+        wireMock.stubFor(get(urlEqualTo("/guilds/g2/channels"))
+                .willReturn(okJson("[{\"id\":\"ch-g2\",\"name\":\"lobby\",\"type\":0}]")));
+
+        final var multiPlatform = new DiscordChatPlatform(client, presenceCache, "test-token");
+        multiPlatform.init();
+
+        List<Channel> channels = multiPlatform.discovery().listChannels();
+        assertThat(channels).hasSize(2);
+        assertThat(channels).extracting(Channel::name).containsExactlyInAnyOrder("general", "lobby");
     }
 
     @Test
@@ -503,7 +570,7 @@ class DiscordChatPlatformTest {
                         .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
 
         recordingSink = new RecordingSink();
-        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token");
 
         inboundConnector.start(recordingSink);
 
@@ -514,6 +581,7 @@ class DiscordChatPlatformTest {
                 {
                   "id": "msg-789",
                   "channel_id": "channel-456",
+                  "guild_id": "guild-123",
                   "author": {"id": "user-123", "username": "alice", "bot": false},
                   "content": "Hello Discord",
                   "type": 0
@@ -547,7 +615,7 @@ class DiscordChatPlatformTest {
                         .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
 
         recordingSink = new RecordingSink();
-        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token");
 
         inboundConnector.start(recordingSink);
         embeddedGateway.expectConnections(1);
@@ -583,7 +651,7 @@ class DiscordChatPlatformTest {
                         .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
 
         recordingSink = new RecordingSink();
-        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token");
 
         inboundConnector.start(recordingSink);
         embeddedGateway.expectConnections(1);
@@ -608,7 +676,7 @@ class DiscordChatPlatformTest {
     @Test
     void inbound_blankTokenConnectorInactive() throws Exception {
         recordingSink = new RecordingSink();
-        inboundConnector = new DiscordInboundConnector(client, presenceCache, "", "guild-123");
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "");
 
         inboundConnector.start(recordingSink);
 
@@ -620,7 +688,7 @@ class DiscordChatPlatformTest {
     @Test
     void inbound_blankGuildIdConnectorInactive() throws Exception {
         recordingSink = new RecordingSink();
-        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "");
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "");
 
         inboundConnector.start(recordingSink);
 
@@ -640,7 +708,7 @@ class DiscordChatPlatformTest {
                         .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
 
         recordingSink = new RecordingSink();
-        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token");
 
         inboundConnector.start(recordingSink);
         embeddedGateway.expectConnections(1);
@@ -678,7 +746,7 @@ class DiscordChatPlatformTest {
                         .withBody("{\"url\": \"ws://localhost:" + embeddedGateway.getPort() + "\"}")));
 
         recordingSink = new RecordingSink();
-        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token", "guild-123");
+        inboundConnector = new DiscordInboundConnector(client, presenceCache, "test-token");
 
         inboundConnector.start(recordingSink);
         embeddedGateway.expectConnections(1);

@@ -1,23 +1,38 @@
 package io.casehub.connectors.discord;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.assertj.core.api.Assertions.*;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Set;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.casehub.connectors.Attachment;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import io.casehub.connectors.Attachment;
+import io.casehub.connectors.discord.model.DiscordAttachment;
+import io.casehub.connectors.discord.model.DiscordChannel;
+import io.casehub.connectors.discord.model.DiscordEmbed;
+import io.casehub.connectors.discord.model.DiscordGuild;
+import io.casehub.connectors.discord.model.DiscordMember;
+import io.casehub.connectors.discord.model.DiscordMessage;
+import io.casehub.connectors.discord.model.PostResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.casehub.connectors.discord.model.*;
+import java.util.List;
+import java.util.Set;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.delete;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.put;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 class DiscordClientTest {
 
@@ -32,11 +47,11 @@ class DiscordClientTest {
         wireMock = new WireMockServer(WireMockConfiguration.options().dynamicPort());
         wireMock.start();
 
-        client = new DiscordClient();
-        client.apiBaseUrl = wireMock.baseUrl();
-        client.guildId = GUILD_ID;
-        client.maxAttachmentBytes = 8_388_608;
-    }
+        client                       = new DiscordClient();
+        client.apiBaseUrl            = wireMock.baseUrl();
+        client.maxAttachmentBytes    = 8_388_608;
+        client.allowedCdnHostsConfig = "cdn.discordapp.com,media.discordapp.net";
+        client.init();}
 
     @AfterEach
     void teardown() {
@@ -140,7 +155,7 @@ class DiscordClientTest {
                         .withBody("[{\"id\":\"ch1\",\"name\":\"general\",\"type\":0}," +
                                 "{\"id\":\"ch2\",\"name\":\"random\",\"type\":0,\"topic\":\"Random stuff\"}]")));
 
-        final List<DiscordChannel> channels = client.listGuildChannels(TOKEN);
+        final List<DiscordChannel> channels = client.listGuildChannels(TOKEN, GUILD_ID);
 
         assertThat(channels).hasSize(2);
         assertThat(channels.get(0).id()).isEqualTo("ch1");
@@ -173,6 +188,33 @@ class DiscordClientTest {
     }
 
     @Test
+    void parseChannel_extractsGuildId() {
+        wireMock.stubFor(get(urlEqualTo("/channels/ch1"))
+                                 .willReturn(okJson("""
+                                                    {"id":"ch1","name":"general","type":0,"guild_id":"g1"}
+                                                    """)));
+
+        final DiscordChannel channel = client.getChannel(TOKEN, "ch1");
+
+        assertThat(channel).isNotNull();
+        assertThat(channel.guildId()).isEqualTo("g1");
+    }
+
+    @Test
+    void parseChannel_nullGuildIdWhenAbsent() {
+        wireMock.stubFor(get(urlEqualTo("/channels/dm1"))
+                                 .willReturn(okJson("""
+                                                    {"id":"dm1","name":"DM","type":1}
+                                                    """)));
+
+        final DiscordChannel channel = client.getChannel(TOKEN, "dm1");
+
+        assertThat(channel).isNotNull();
+        assertThat(channel.guildId()).isNull();
+    }
+
+
+    @Test
     void createChannel_sendsCorrectBody() {
         wireMock.stubFor(post(urlEqualTo("/guilds/" + GUILD_ID + "/channels"))
                 .willReturn(aResponse()
@@ -180,7 +222,7 @@ class DiscordClientTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"id\":\"ch-new\",\"name\":\"test\",\"type\":0}")));
 
-        final DiscordChannel channel = client.createChannel(TOKEN, "test", "t", 0, false, false);
+        final DiscordChannel channel = client.createChannel(TOKEN, GUILD_ID, "test", "t", 0, false, false);
 
         assertThat(channel).isNotNull();
 
@@ -198,7 +240,7 @@ class DiscordClientTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"id\":\"ch-private\",\"name\":\"private\",\"type\":0}")));
 
-        final DiscordChannel channel = client.createChannel(TOKEN, "private", "secret", 0, false, true);
+        final DiscordChannel channel = client.createChannel(TOKEN, GUILD_ID, "private", "secret", 0, false, true);
 
         assertThat(channel).isNotNull();
 
@@ -257,7 +299,7 @@ class DiscordClientTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"user\":{\"id\":\"u3\",\"username\":\"user3\",\"global_name\":\"User Three\",\"bot\":false},\"joined_at\":\"2024-01-01T00:00:00Z\"}]")));
 
-        final List<DiscordMember> members = client.listGuildMembers(TOKEN, 100, null);
+        final List<DiscordMember> members = client.listGuildMembers(TOKEN, GUILD_ID, 100, null);
 
         assertThat(members).hasSize(3);
         assertThat(members.get(0).user().id()).isEqualTo("u1");
@@ -275,7 +317,7 @@ class DiscordClientTest {
         wireMock.stubFor(get(urlMatching("/guilds/" + GUILD_ID + "/members\\?limit=100&after=u1"))
                 .willReturn(aResponse().withStatus(500)));
 
-        final List<DiscordMember> members = client.listGuildMembers(TOKEN, 100, null);
+        final List<DiscordMember> members = client.listGuildMembers(TOKEN, GUILD_ID, 100, null);
 
         assertThat(members).hasSize(1);
     }
@@ -288,7 +330,7 @@ class DiscordClientTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"user\":{\"id\":\"u1\",\"username\":\"user1\",\"global_name\":\"User One\",\"bot\":false},\"joined_at\":\"2024-01-01T00:00:00Z\"}")));
 
-        final DiscordMember member = client.getGuildMember(TOKEN, "u1");
+        final DiscordMember member = client.getGuildMember(TOKEN, GUILD_ID, "u1");
 
         assertThat(member).isNotNull();
         assertThat(member.user().id()).isEqualTo("u1");
@@ -299,7 +341,7 @@ class DiscordClientTest {
         wireMock.stubFor(get(urlEqualTo("/guilds/" + GUILD_ID + "/members/u1"))
                 .willReturn(aResponse().withStatus(404)));
 
-        final DiscordMember member = client.getGuildMember(TOKEN, "u1");
+        final DiscordMember member = client.getGuildMember(TOKEN, GUILD_ID, "u1");
 
         assertThat(member).isNull();
     }
@@ -312,7 +354,7 @@ class DiscordClientTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"id\":\"" + GUILD_ID + "\",\"name\":\"Test Guild\",\"approximate_member_count\":42}")));
 
-        final DiscordGuild guild = client.getGuild(TOKEN, true);
+        final DiscordGuild guild = client.getGuild(TOKEN, GUILD_ID, true);
 
         assertThat(guild).isNotNull();
         assertThat(guild.id()).isEqualTo(GUILD_ID);
@@ -369,6 +411,60 @@ class DiscordClientTest {
 
         assertThat(gatewayUrl).isEqualTo("wss://gateway.discord.gg/");
     }
+
+    @Test
+    void listBotGuilds_success() {
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                                 .willReturn(okJson("""
+                                                    [{"id":"g1","name":"Guild One"},
+                                                     {"id":"g2","name":"Guild Two"}]
+                                                    """)));
+        wireMock.stubFor(get(urlMatching("/users/@me/guilds\\?limit=200&after=g2"))
+                                 .willReturn(okJson("[]")));
+
+        final List<DiscordGuild> guilds = client.listBotGuilds(TOKEN);
+
+        assertThat(guilds).hasSize(2);
+        assertThat(guilds.get(0).id()).isEqualTo("g1");
+        assertThat(guilds.get(0).name()).isEqualTo("Guild One");
+        assertThat(guilds.get(1).id()).isEqualTo("g2");
+    }
+
+    @Test
+    void listBotGuilds_nullOnFirstPageFailure() {
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                                 .willReturn(aResponse().withStatus(401)));
+
+        final List<DiscordGuild> guilds = client.listBotGuilds(TOKEN);
+
+        assertThat(guilds).isNull();
+    }
+
+    @Test
+    void listBotGuilds_failSoftOnPage2() {
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                                 .willReturn(okJson("""
+                                                    [{"id":"g1","name":"Guild One"}]
+                                                    """)));
+        wireMock.stubFor(get(urlMatching("/users/@me/guilds\\?limit=200&after=g1"))
+                                 .willReturn(aResponse().withStatus(500)));
+
+        final List<DiscordGuild> guilds = client.listBotGuilds(TOKEN);
+
+        assertThat(guilds).hasSize(1);
+        assertThat(guilds.get(0).id()).isEqualTo("g1");
+    }
+
+    @Test
+    void listBotGuilds_emptyListForNoGuilds() {
+        wireMock.stubFor(get(urlEqualTo("/users/@me/guilds?limit=200"))
+                                 .willReturn(okJson("[]")));
+
+        final List<DiscordGuild> guilds = client.listBotGuilds(TOKEN);
+
+        assertThat(guilds).isEmpty();
+    }
+
 
     // ── Attachment parsing ────────────────────────────────────────────────────
 
@@ -512,9 +608,14 @@ class DiscordClientTest {
     }
 
     @Test
-    void guildId_returnsConfiguredValue() {
-        assertThat(client.guildId()).isEqualTo(GUILD_ID);
+    void downloadAttachment_nullUrl_returnsNull() {
+        final var att = new DiscordAttachment("a1", "file.png", "image/png", 100, null);
+
+        final Attachment result = client.downloadAttachment(att);
+
+        assertThat(result).isNull();
     }
+
 
     // ── Embed sending ─────────────────────────────────────────────────────────
 
