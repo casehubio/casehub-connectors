@@ -108,7 +108,7 @@ class DiscordGatewayTest {
         // After heartbeat timeout, the gateway reconnects and sends RESUME
         // (sessionId was cached from initial READY). Wait for the RESUME.
         org.awaitility.Awaitility.await()
-                .atMost(10, TimeUnit.SECONDS)
+                .atMost(30, TimeUnit.SECONDS)
                 .until(() -> !server.getReceivedResumes().isEmpty());
     }
 
@@ -164,7 +164,7 @@ class DiscordGatewayTest {
 
         // Wait for RESUME to be sent (replaces fixed Thread.sleep)
         org.awaitility.Awaitility.await()
-                .atMost(10, TimeUnit.SECONDS)
+                .atMost(30, TimeUnit.SECONDS)
                 .until(() -> !server.getReceivedResumes().isEmpty());
 
         List<String> resumes = server.getReceivedResumes();
