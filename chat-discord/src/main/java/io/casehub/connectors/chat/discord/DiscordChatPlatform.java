@@ -44,7 +44,11 @@ public class DiscordChatPlatform implements ChatPlatform {
     private final DiscordClient client;
     private final DiscordGatewayPresenceCache presenceCache;
     private final String token;
-    private final String guildId;
+
+    private List<DiscordGuild> guilds = List.of();
+    private java.util.Map<String, DiscordGuild> guildDetails = java.util.Map.of();
+    private final java.util.concurrent.ConcurrentHashMap<String, String> channelToGuild = new java.util.concurrent.ConcurrentHashMap<>();
+    private Set<Class<?>> activeCapabilities = Set.of();
 
     private Messaging messaging;
     private Threading threading;
@@ -56,19 +60,14 @@ public class DiscordChatPlatform implements ChatPlatform {
     private final MemberManagement memberManagement = new NoOpMemberManagement();
     private MessageHistory messageHistory;
 
-    /**
-     * CDI constructor.
-     */
     @Inject
     public DiscordChatPlatform(
             final DiscordClient client,
             final DiscordGatewayPresenceCache presenceCache,
-            @ConfigProperty(name = "casehub.discord.token", defaultValue = "") final String token,
-            @ConfigProperty(name = "casehub.discord.guild-id", defaultValue = "") final String guildId) {
+            @ConfigProperty(name = "casehub.discord.token", defaultValue = "") final String token) {
         this.client = client;
         this.presenceCache = presenceCache;
         this.token = token;
-        this.guildId = guildId;
     }
 
     /**
@@ -76,26 +75,52 @@ public class DiscordChatPlatform implements ChatPlatform {
      */
     @PostConstruct
     void init() {
-        if (token.isBlank() || guildId.isBlank()) {
-            LOG.warning("discord: token or guild-id not configured, platform inactive");
-            this.messaging = (channel, content) -> SendResult.failure("Discord not configured");
-            this.threading = new ChannelFallbackThreading(this.messaging);
-            this.discovery = new EmptyDiscovery();
-            this.reactions = new NoOpReactions();
-            this.presence = new UnknownPresence();
-            this.members = new EmptyMembers();
-            this.channelManagement = new NoOpChannelManagement();
-            this.messageHistory = new EmptyMessageHistory();
-        } else {
-            this.messaging = this::sendMessage;
-            this.threading = this::sendReply;
-            this.discovery = this::listChannels;
-            this.reactions = new DiscordReactions();
-            this.presence = new DiscordPresence();
-            this.members = this::listMembers;
-            this.channelManagement = new DiscordChannelManagement();
-            this.messageHistory = this::getMessageHistory;
+        if (token.isBlank()) {
+            LOG.warning("discord: token not configured, platform inactive");
+            initDegraded();
+            return;
         }
+
+        final List<DiscordGuild> discovered = client.listBotGuilds(token);
+        if (discovered == null) {
+            LOG.severe("discord: failed to discover guilds — check token and network connectivity");
+            initDegraded();
+            return;
+        }
+        if (discovered.isEmpty()) {
+            LOG.warning("discord: bot not added to any guild, platform inactive");
+            initDegraded();
+            return;
+        }
+
+        this.guilds = discovered;
+        this.guildDetails = new java.util.HashMap<>();
+        for (final DiscordGuild g : guilds) {
+            final DiscordGuild details = client.getGuild(token, g.id(), true);
+            guildDetails.put(g.id(), details != null ? details : g);
+        }
+        this.activeCapabilities = NATIVE_CAPABILITIES;
+
+        this.messaging = this::sendMessage;
+        this.threading = this::sendReply;
+        this.discovery = this::listChannels;
+        this.reactions = new DiscordReactions();
+        this.presence = new DiscordPresence();
+        this.members = this::listMembers;
+        this.channelManagement = new DiscordChannelManagement();
+        this.messageHistory = this::getMessageHistory;
+    }
+
+    private void initDegraded() {
+        this.activeCapabilities = Set.of();
+        this.messaging = (channel, content) -> SendResult.failure("Discord not configured");
+        this.threading = new ChannelFallbackThreading(this.messaging);
+        this.discovery = new EmptyDiscovery();
+        this.reactions = new NoOpReactions();
+        this.presence = new UnknownPresence();
+        this.members = new EmptyMembers();
+        this.channelManagement = new NoOpChannelManagement();
+        this.messageHistory = new EmptyMessageHistory();
     }
 
     @Override
@@ -150,7 +175,7 @@ public class DiscordChatPlatform implements ChatPlatform {
 
     @Override
     public boolean supports(final Class<?> capability) {
-        return NATIVE_CAPABILITIES.contains(capability);
+        return activeCapabilities.contains(capability);
     }
 
     // Messaging implementation
@@ -211,14 +236,20 @@ public class DiscordChatPlatform implements ChatPlatform {
 
     // Discovery implementation
     private List<Channel> listChannels() {
-        final List<DiscordChannel> channels = client.listGuildChannels(token);
-        final DiscordGuild guild = client.getGuild(token, true);
-        final Integer memberCount = guild != null ? guild.approximateMemberCount() : null;
+        final List<Channel> allChannels = new ArrayList<>();
+        for (final DiscordGuild guild : guilds) {
+            final List<DiscordChannel> channels = client.listGuildChannels(token, guild.id());
+            final DiscordGuild details = guildDetails.get(guild.id());
+            final Integer memberCount = details != null ? details.approximateMemberCount() : null;
 
-        return channels.stream()
-                .filter(ch -> isTextChannel(ch.type()))
-                .map(ch -> toChannel(ch, memberCount))
-                .toList();
+            for (final DiscordChannel ch : channels) {
+                if (isTextChannel(ch.type())) {
+                    channelToGuild.put(ch.id(), guild.id());
+                    allChannels.add(toChannel(ch, memberCount));
+                }
+            }
+        }
+        return allChannels;
     }
 
     private boolean isTextChannel(final int type) {
@@ -238,10 +269,14 @@ public class DiscordChatPlatform implements ChatPlatform {
     }
 
     private boolean isPrivateChannel(final DiscordChannel channel) {
+        final String everyoneRoleId = channel.guildId();
+        if (everyoneRoleId == null) {
+            return false;
+        }
         return channel.permissionOverwrites().stream()
-                .anyMatch(po -> po.type() == 0 // role type
-                        && po.id().equals(guildId) // @everyone role
-                        && (po.deny() & VIEW_CHANNEL_BIT) != 0); // VIEW_CHANNEL denied
+                .anyMatch(po -> po.type() == 0
+                        && po.id().equals(everyoneRoleId)
+                        && (po.deny() & VIEW_CHANNEL_BIT) != 0);
     }
 
     // Reactions implementation
@@ -284,11 +319,25 @@ public class DiscordChatPlatform implements ChatPlatform {
 
     // Members implementation
     private List<Member> listMembers(final ChatChannelRef channel) {
-        final List<DiscordMember> members = client.listGuildMembers(token, 1000, null);
+        final String resolvedGuildId = resolveGuildId(channel.id());
+        final List<DiscordMember> members = client.listGuildMembers(token, resolvedGuildId, 1000, null);
+        return members.stream().map(this::toMember).toList();
+    }
 
-        return members.stream()
-                .map(this::toMember)
-                .toList();
+    private String resolveGuildId(final String channelId) {
+        if (guilds.size() == 1) {
+            return guilds.get(0).id();
+        }
+        final String cached = channelToGuild.get(channelId);
+        if (cached != null) {
+            return cached;
+        }
+        final DiscordChannel ch = client.getChannel(token, channelId);
+        if (ch != null && ch.guildId() != null) {
+            channelToGuild.put(channelId, ch.guildId());
+            return ch.guildId();
+        }
+        return guilds.get(0).id();
     }
 
     private Member toMember(final DiscordMember dm) {
@@ -301,7 +350,12 @@ public class DiscordChatPlatform implements ChatPlatform {
     private class DiscordChannelManagement implements ChannelManagement {
         @Override
         public Channel create(final String name, final String topic, final String description, final boolean isPrivate) {
-            final DiscordChannel dc = client.createChannel(token, name, topic, 0, false, isPrivate);
+            if (guilds.size() != 1) {
+                throw new IllegalStateException(
+                        "Multiple guilds — channel creation requires disambiguation");
+            }
+            final String targetGuildId = guilds.get(0).id();
+            final DiscordChannel dc = client.createChannel(token, targetGuildId, name, topic, 0, false, isPrivate);
             if (dc == null) {
                 throw new IllegalStateException("Channel creation failed");
             }
@@ -318,6 +372,9 @@ public class DiscordChatPlatform implements ChatPlatform {
             final DiscordChannel dc = client.getChannel(token, channelId);
             if (dc == null) {
                 return Optional.empty();
+            }
+            if (dc.guildId() != null) {
+                channelToGuild.put(dc.id(), dc.guildId());
             }
             return Optional.of(toChannel(dc, null));
         }
