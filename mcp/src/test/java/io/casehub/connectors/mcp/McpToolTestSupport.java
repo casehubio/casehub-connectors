@@ -1,11 +1,11 @@
 package io.casehub.connectors.mcp;
 
-import java.util.List;
-
 import io.casehub.connectors.Connector;
 import io.casehub.connectors.ConnectorMeshBridge;
 import io.casehub.connectors.ConnectorMessage;
 import io.casehub.connectors.ConnectorService;
+
+import java.util.List;
 
 /** Shared test doubles for MCP tool unit tests. */
 public final class McpToolTestSupport {
@@ -28,8 +28,9 @@ public final class McpToolTestSupport {
         }
 
         @Override
-        public void send(final ConnectorMessage message) {
+        public boolean send(final ConnectorMessage message) {
             this.lastMessage = message;
+            return true;
         }
 
         public void reset() {

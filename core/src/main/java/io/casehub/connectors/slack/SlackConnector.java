@@ -1,12 +1,11 @@
 package io.casehub.connectors.slack;
 
-import java.util.logging.Logger;
-
-import jakarta.enterprise.context.ApplicationScoped;
-
 import io.casehub.connectors.Connector;
 import io.casehub.connectors.ConnectorMessage;
 import io.casehub.connectors.http.HttpHelper;
+import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.logging.Logger;
 
 /**
  * Slack connector via Incoming Webhooks.
@@ -38,13 +37,18 @@ public class SlackConnector implements Connector {
     }
 
     @Override
-    public void send(final ConnectorMessage message) {
-        final String json = buildPayload(message.title(), message.body());
-        final boolean ok = HttpHelper.postJson(message.destination(), json);
+    public boolean send(final ConnectorMessage message) {
+        final String  json = buildPayload(message.title(), message.body());
+        final boolean ok   = HttpHelper.postJson(message.destination(), json);
         if (!ok) {
             LOG.warning("Slack connector failed for destination: " + message.destination());
         }
+        return ok;
     }
+
+    @Override
+    public String channelType() {return null;}
+
 
     /** Package-private for unit testing. */
     public static String buildPayload(final String title, final String body) {

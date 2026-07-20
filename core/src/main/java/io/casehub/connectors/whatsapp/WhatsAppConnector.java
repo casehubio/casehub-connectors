@@ -1,15 +1,13 @@
 package io.casehub.connectors.whatsapp;
 
-import java.util.logging.Logger;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
 import io.casehub.connectors.Connector;
 import io.casehub.connectors.ConnectorMessage;
 import io.casehub.connectors.http.HttpHelper;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.util.logging.Logger;
 
 /**
  * WhatsApp Business connector via the Meta Cloud API.
@@ -54,25 +52,26 @@ public class WhatsAppConnector implements Connector {
     }
 
     @Override
-    public void send(final ConnectorMessage message) {
+    public boolean send(final ConnectorMessage message) {
         if (apiToken.isBlank() || phoneNumberId.isBlank()) {
             LOG.warning("WhatsAppConnector: casehub.connectors.whatsapp.* not configured — message not sent");
-            return;
+            return false;
         }
 
         final String url = "https://graph.facebook.com/v18.0/" + phoneNumberId + "/messages";
-        final String to = message.destination().replaceAll("[^0-9+]", "");
+        final String to  = message.destination().replaceAll("[^0-9+]", "");
         final String templateName = message.attributes() != null
-                ? message.attributes().get("templateName") : null;
+                                    ? message.attributes().get("templateName") : null;
         final String templateLanguage = (message.attributes() != null
-                && message.attributes().get("templateLanguage") != null)
-                ? message.attributes().get("templateLanguage") : "en_US";
+                                         && message.attributes().get("templateLanguage") != null)
+                                        ? message.attributes().get("templateLanguage") : "en_US";
 
-        final String json = buildPayload(to, message.body(), templateName, templateLanguage);
-        final boolean ok = HttpHelper.postJson(url, json, "Authorization", "Bearer " + apiToken);
+        final String  json = buildPayload(to, message.body(), templateName, templateLanguage);
+        final boolean ok   = HttpHelper.postJson(url, json, "Authorization", "Bearer " + apiToken);
         if (!ok) {
             LOG.warning("WhatsApp connector failed to: " + to);
         }
+        return ok;
     }
 
     /**

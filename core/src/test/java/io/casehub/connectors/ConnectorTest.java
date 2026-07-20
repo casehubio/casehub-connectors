@@ -1,22 +1,19 @@
 package io.casehub.connectors;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.ok;
-import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.verify;
-import static org.assertj.core.api.Assertions.assertThat;
-
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import io.casehub.connectors.http.HttpHelper;
+import io.casehub.connectors.slack.SlackConnector;
+import io.casehub.connectors.teams.TeamsConnector;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-
-import io.casehub.connectors.slack.SlackConnector;
-import io.casehub.connectors.teams.TeamsConnector;
-import io.casehub.connectors.http.HttpHelper;
+import static com.github.tomakehurst.wiremock.client.WireMock.ok;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit and WireMock integration tests for connector implementations.
@@ -149,5 +146,32 @@ class ConnectorTest {
     void httpHelper_postJson_returnsTrueOn200() {
         final boolean result = HttpHelper.postJson(baseUrl + "/hook", "{}");
         assertThat(result).isTrue();
+    }
+
+    @Test
+    void channelType_defaultsToId() {
+        Connector connector = new Connector() {
+            @Override
+            public String id()                            {return "my-connector";}
+
+            @Override
+            public boolean send(ConnectorMessage message) {return true;}
+        };
+        assertThat(connector.channelType()).isEqualTo("my-connector");
+    }
+
+    @Test
+    void channelType_canBeOverriddenToNull() {
+        Connector connector = new Connector() {
+            @Override
+            public String id()                            {return "slack";}
+
+            @Override
+            public boolean send(ConnectorMessage message) {return true;}
+
+            @Override
+            public String channelType()                   {return null;}
+        };
+        assertThat(connector.channelType()).isNull();
     }
 }

@@ -39,6 +39,19 @@ public interface Connector {
      * Send a message via this connector.
      *
      * @param message the message to deliver; must not be null
+     * @return true if delivery succeeded, false on failure
      */
-    void send(ConnectorMessage message);
+    boolean send(ConnectorMessage message);
+
+    /**
+     * Notification channel type this connector implements.
+     *
+     * <p>Defaults to {@link #id()}. Override to map to a different channel type
+     * (e.g., {@code "sms"} for a Twilio connector with id {@code "twilio-sms"}).
+     * Return {@code null} to opt out of notification bridging.
+     *
+     * @return channel type string, or null to opt out
+     */
+    default String channelType() {return id();}
+
 }

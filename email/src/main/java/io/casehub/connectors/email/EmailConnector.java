@@ -1,14 +1,13 @@
 package io.casehub.connectors.email;
 
-import java.util.logging.Logger;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-
 import io.casehub.connectors.Connector;
 import io.casehub.connectors.ConnectorMessage;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.Mailer;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.util.logging.Logger;
 
 /**
  * Email connector backed by {@code quarkus-mailer}.
@@ -47,22 +46,24 @@ public class EmailConnector implements Connector {
     }
 
     @Override
-    public void send(final ConnectorMessage message) {
+    public boolean send(final ConnectorMessage message) {
         if (message.destination() == null || message.destination().isBlank()) {
             LOG.warning("EmailConnector: destination (email address) is blank — message not sent");
-            return;
+            return false;
         }
 
         final String subject = message.title() != null && !message.title().isBlank()
-                ? message.title()
-                : "Notification";
+                               ? message.title()
+                               : "Notification";
         final String body = message.body() != null ? message.body() : "";
 
         try {
             mailer.send(Mail.withText(message.destination(), subject, body));
+            return true;
         } catch (final Exception e) {
             LOG.warning("EmailConnector: failed to send to " + message.destination()
-                    + ": " + e.getMessage());
+                        + ": " + e.getMessage());
+            return false;
         }
     }
 }

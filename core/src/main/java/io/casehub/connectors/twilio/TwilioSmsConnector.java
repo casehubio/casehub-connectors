@@ -1,5 +1,12 @@
 package io.casehub.connectors.twilio;
 
+import io.casehub.connectors.Connector;
+import io.casehub.connectors.ConnectorMessage;
+import io.casehub.connectors.http.HttpHelper;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -7,15 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.logging.Logger;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import io.casehub.connectors.Connector;
-import io.casehub.connectors.ConnectorMessage;
-import io.casehub.connectors.http.HttpHelper;
 
 /**
  * Twilio SMS connector via the Twilio Messages REST API.
@@ -62,39 +60,46 @@ public class TwilioSmsConnector implements Connector {
     }
 
     @Override
-    public void send(final ConnectorMessage message) {
+    public boolean send(final ConnectorMessage message) {
         if (accountSid.isBlank() || authToken.isBlank() || from.isBlank()) {
             LOG.warning("TwilioSmsConnector: casehub.connectors.twilio.* not configured — message not sent");
-            return;
+            return false;
         }
 
         final String url = TWILIO_API + accountSid + "/Messages.json";
         final String body = "To=" + encode(message.destination())
-                + "&From=" + encode(from)
-                + "&Body=" + encode(message.body() != null ? message.body() : "");
+                            + "&From=" + encode(from)
+                            + "&Body=" + encode(message.body() != null ? message.body() : "");
 
         final String credentials = Base64.getEncoder()
-                .encodeToString((accountSid + ":" + authToken).getBytes(StandardCharsets.UTF_8));
+                                         .encodeToString((accountSid + ":" + authToken).getBytes(StandardCharsets.UTF_8));
 
         try {
             final HttpResponse<String> response = HttpHelper.CLIENT.send(
                     HttpRequest.newBuilder()
-                            .uri(URI.create(url))
-                            .timeout(Duration.ofSeconds(10))
-                            .header("Content-Type", "application/x-www-form-urlencoded")
-                            .header("Authorization", "Basic " + credentials)
-                            .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                            .build(),
+                               .uri(URI.create(url))
+                               .timeout(Duration.ofSeconds(10))
+                               .header("Content-Type", "application/x-www-form-urlencoded")
+                               .header("Authorization", "Basic " + credentials)
+                               .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                               .build(),
                     HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 LOG.warning("Twilio SMS failed to " + message.destination()
-                        + " status=" + response.statusCode());
+                            + " status=" + response.statusCode());
+                return false;
             }
+            return true;
         } catch (final Exception e) {
             LOG.warning("Twilio SMS error to " + message.destination() + ": " + e.getMessage());
+            return false;
         }
     }
+
+    @Override
+    public String channelType() {return "sms";}
+
 
     private static String encode(final String s) {
         return java.net.URLEncoder.encode(s, StandardCharsets.UTF_8);

@@ -1,11 +1,11 @@
 package io.casehub.connectors;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ConnectorServiceTest {
 
@@ -23,8 +23,9 @@ class ConnectorServiceTest {
         }
 
         @Override
-        public void send(final ConnectorMessage msg) {
+        public boolean send(final ConnectorMessage msg) {
             this.received = msg;
+            return true;
         }
     }
 

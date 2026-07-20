@@ -1,14 +1,13 @@
 package io.casehub.connectors;
 
+import io.quarkus.arc.All;
+import jakarta.enterprise.context.ApplicationScoped;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import jakarta.enterprise.context.ApplicationScoped;
-
-import io.quarkus.arc.All;
 
 /**
  * Routes outbound messages to the appropriate {@link Connector} by id.
@@ -43,16 +42,17 @@ public class ConnectorService {
      *
      * @param connectorId id of the connector to use (e.g. {@code "slack"})
      * @param message     the message to deliver
+     * @return true if the connector reported success
      * @throws IllegalArgumentException if no connector is registered for {@code connectorId}
      */
-    public void send(final String connectorId, final ConnectorMessage message) {
+    public boolean send(final String connectorId, final ConnectorMessage message) {
         final Connector connector = registry.get(connectorId);
         if (connector == null) {
             throw new IllegalArgumentException(
                     "No connector registered for id '" + connectorId
                     + "'. Available: " + registry.keySet());
         }
-        connector.send(message);
+        return connector.send(message);
     }
 
     /**
