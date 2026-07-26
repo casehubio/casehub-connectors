@@ -58,12 +58,17 @@ public class EmailConnector implements Connector {
         final String body = message.body() != null ? message.body() : "";
 
         try {
-            mailer.send(Mail.withText(message.destination(), subject, body));
+            String format = message.attributes() != null
+                            ? message.attributes().getOrDefault("format", "text") : "text";
+            if ("html".equals(format)) {
+                mailer.send(Mail.withHtml(message.destination(), subject, body));
+            } else {
+                mailer.send(Mail.withText(message.destination(), subject, body));
+            }
             return true;
         } catch (final Exception e) {
             LOG.warning("EmailConnector: failed to send to " + message.destination()
                         + ": " + e.getMessage());
             return false;
-        }
-    }
+        }}
 }

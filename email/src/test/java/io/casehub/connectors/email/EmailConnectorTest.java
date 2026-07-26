@@ -1,16 +1,12 @@
 package io.casehub.connectors.email;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.util.List;
-
-import jakarta.inject.Inject;
-
-import org.junit.jupiter.api.Test;
-
 import io.casehub.connectors.ConnectorMessage;
 import io.quarkus.mailer.MockMailbox;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
 class EmailConnectorTest {
@@ -53,4 +49,39 @@ class EmailConnectorTest {
     void connectorId_isEmail() {
         assertThat(connector.id()).isEqualTo("email");
     }
+
+    @Test
+    void send_htmlFormat_usesMailWithHtml() {
+        mailbox.clear();
+        var attributes = java.util.Map.of("format", "html");
+        connector.send(new ConnectorMessage("alice@example.com", "Digest",
+                                            "<html><body><h1>Report</h1></body></html>", attributes));
+
+        final var messages = mailbox.getMailMessagesSentTo("alice@example.com");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getHtml()).contains("<h1>Report</h1>");
+    }
+
+    @Test
+    void send_noFormatAttribute_usesPlainText() {
+        mailbox.clear();
+        connector.send(new ConnectorMessage("bob@example.com", "Alert", "Plain text body"));
+
+        final var messages = mailbox.getMailMessagesSentTo("bob@example.com");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getText()).isEqualTo("Plain text body");
+        assertThat(messages.get(0).getHtml()).isNull();
+    }
+
+    @Test
+    void send_textFormatAttribute_usesPlainText() {
+        mailbox.clear();
+        var attributes = java.util.Map.of("format", "text");
+        connector.send(new ConnectorMessage("bob@example.com", "Alert", "Plain body", attributes));
+
+        final var messages = mailbox.getMailMessagesSentTo("bob@example.com");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getText()).isEqualTo("Plain body");
+    }
+
 }
