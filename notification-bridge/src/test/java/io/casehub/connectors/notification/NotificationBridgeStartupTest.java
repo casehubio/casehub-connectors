@@ -120,7 +120,7 @@ class NotificationBridgeStartupTest {
         var resolver  = new StubResolver("email");
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(resolver), registry, EMPTY_CONFIG);
+                List.of(connector), List.of(resolver), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         assertThat(registry.descriptors).containsKey("email");
@@ -133,7 +133,7 @@ class NotificationBridgeStartupTest {
         var connector = new StubConnector("email");
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(), registry, EMPTY_CONFIG);
+                List.of(connector), List.of(), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         assertThat(registry.descriptors).containsKey("email");
@@ -146,7 +146,7 @@ class NotificationBridgeStartupTest {
         var connector = new StubConnector("slack", null);
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(), registry, EMPTY_CONFIG);
+                List.of(connector), List.of(), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         assertThat(registry.descriptors).isEmpty();
@@ -159,7 +159,7 @@ class NotificationBridgeStartupTest {
         var resolver  = new StubResolver("sms");
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(resolver), registry, EMPTY_CONFIG);
+                List.of(connector), List.of(resolver), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         assertThat(registry.descriptors).containsKey("sms");
@@ -173,7 +173,7 @@ class NotificationBridgeStartupTest {
         var c2       = new StubConnector("email-ses", "email");
 
         var startup = new NotificationBridgeStartup(
-                List.of(c1, c2), List.of(), registry, EMPTY_CONFIG);
+                List.of(c1, c2), List.of(), List.of(), registry, EMPTY_CONFIG);
 
         assertThatThrownBy(startup::registerBridgedChannels)
                 .isInstanceOf(IllegalStateException.class)
@@ -184,7 +184,7 @@ class NotificationBridgeStartupTest {
     void descriptorDefaults_email() {
         var registry = new RecordingRegistry();
         var startup = new NotificationBridgeStartup(
-                List.of(new StubConnector("email")), List.of(), registry, EMPTY_CONFIG);
+                List.of(new StubConnector("email")), List.of(), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         var desc = registry.descriptors.get("email");
@@ -200,7 +200,7 @@ class NotificationBridgeStartupTest {
     void descriptorDefaults_sms() {
         var registry = new RecordingRegistry();
         var startup = new NotificationBridgeStartup(
-                List.of(new StubConnector("twilio-sms", "sms")), List.of(), registry, EMPTY_CONFIG);
+                List.of(new StubConnector("twilio-sms", "sms")), List.of(), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         var desc = registry.descriptors.get("sms");
@@ -212,7 +212,7 @@ class NotificationBridgeStartupTest {
     void descriptorDefaults_whatsapp() {
         var registry = new RecordingRegistry();
         var startup = new NotificationBridgeStartup(
-                List.of(new StubConnector("whatsapp")), List.of(), registry, EMPTY_CONFIG);
+                List.of(new StubConnector("whatsapp")), List.of(), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         var desc = registry.descriptors.get("whatsapp");
@@ -224,7 +224,7 @@ class NotificationBridgeStartupTest {
     void descriptorDefaults_unknownChannelType_usesChannelTypeAsDisplayName() {
         var registry = new RecordingRegistry();
         var startup = new NotificationBridgeStartup(
-                List.of(new StubConnector("custom-channel")), List.of(), registry, EMPTY_CONFIG);
+                List.of(new StubConnector("custom-channel")), List.of(), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         var desc = registry.descriptors.get("custom-channel");
@@ -242,7 +242,7 @@ class NotificationBridgeStartupTest {
                         new StubConnector("whatsapp"),
                         new StubConnector("slack", null)),
                 List.of(new StubResolver("email"), new StubResolver("sms")),
-                registry, EMPTY_CONFIG);
+                List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         assertThat(registry.descriptors.keySet())
@@ -259,7 +259,7 @@ class NotificationBridgeStartupTest {
                 "casehub.notification.destinations.email.user-1", "user1@example.com"));
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(), registry, config);
+                List.of(connector), List.of(), List.of(), registry, config);
         startup.registerBridgedChannels();
 
         assertThat(registry.deliverers).containsKey("email");
@@ -281,7 +281,7 @@ class NotificationBridgeStartupTest {
                 "casehub.notification.destinations.email.user-1", "config@example.com"));
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(cdiResolver), registry, config);
+                List.of(connector), List.of(cdiResolver), List.of(), registry, config);
         startup.registerBridgedChannels();
 
         assertThat(registry.deliverers).containsKey("email");
@@ -293,7 +293,7 @@ class NotificationBridgeStartupTest {
         var connector = new StubConnector("email");
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(), registry, EMPTY_CONFIG);
+                List.of(connector), List.of(), List.of(), registry, EMPTY_CONFIG);
         startup.registerBridgedChannels();
 
         assertThat(registry.deliverers).containsKey("email");
@@ -315,7 +315,7 @@ class NotificationBridgeStartupTest {
                 "casehub.notification.destinations.custom-channel.user-1", "custom-dest"));
 
         var startup = new NotificationBridgeStartup(
-                List.of(connector), List.of(), registry, config);
+                List.of(connector), List.of(), List.of(), registry, config);
         startup.registerBridgedChannels();
 
         assertThat(registry.deliverers).containsKey("custom-channel");

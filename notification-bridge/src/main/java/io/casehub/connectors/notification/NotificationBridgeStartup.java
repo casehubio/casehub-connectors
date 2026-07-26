@@ -35,18 +35,21 @@ public class NotificationBridgeStartup {
 
     private final List<Connector>                        connectors;
     private final List<DestinationResolver>              resolvers;
+    private final List<DigestFormatter>                  digestFormatters;
     private final DeliveryChannelRegistry                channelRegistry;
     private final org.eclipse.microprofile.config.Config config;
 
     @Inject
     public NotificationBridgeStartup(@All List<Connector> connectors,
                                      @All List<DestinationResolver> resolvers,
+                                     @All List<DigestFormatter> digestFormatters,
                                      DeliveryChannelRegistry channelRegistry,
                                      org.eclipse.microprofile.config.Config config) {
-        this.connectors      = connectors;
-        this.resolvers       = resolvers;
-        this.channelRegistry = channelRegistry;
-        this.config          = config;
+        this.connectors       = connectors;
+        this.resolvers        = resolvers;
+        this.digestFormatters = digestFormatters;
+        this.channelRegistry  = channelRegistry;
+        this.config           = config;
     }
 
     @PostConstruct
@@ -54,6 +57,11 @@ public class NotificationBridgeStartup {
         Map<String, DestinationResolver> resolverIndex = new HashMap<>();
         for (DestinationResolver r : resolvers) {
             resolverIndex.put(r.channelId(), r);
+        }
+
+        Map<String, DigestFormatter> formatterIndex = new HashMap<>();
+        for (DigestFormatter f : digestFormatters) {
+            formatterIndex.put(f.channelId(), f);
         }
 
         Map<String, String> seenTypes = new HashMap<>();
@@ -79,8 +87,10 @@ public class NotificationBridgeStartup {
                 }
             }
 
+            DigestFormatter formatter = formatterIndex.get(channelType);
+
             var deliverer = new ConnectorNotificationDeliverer(
-                    connector, channelType, resolver);
+                    connector, channelType, resolver, formatter);
 
             var descriptor = new DeliveryChannelDescriptor(
                     channelType,
