@@ -1,32 +1,28 @@
 package io.casehub.connectors.calendar.google;
 
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.util.DateTime;
+import com.google.api.services.calendar.Calendar;
+import com.google.api.services.calendar.model.CalendarList;
+import com.google.api.services.calendar.model.Events;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.UserCredentials;
+import io.casehub.connectors.calendar.model.CalendarEvent;
+import io.casehub.connectors.calendar.model.CalendarInfo;
+import io.casehub.connectors.calendar.model.EventDetails;
+import io.casehub.connectors.calendar.spi.CalendarPlatform;
+import jakarta.annotation.PostConstruct;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
+
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import jakarta.annotation.PostConstruct;
-import jakarta.enterprise.context.ApplicationScoped;
-
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.util.DateTime;
-import com.google.api.services.calendar.Calendar;
-import com.google.api.services.calendar.model.CalendarList;
-import com.google.api.services.calendar.model.CalendarListEntry;
-import com.google.api.services.calendar.model.Events;
-import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.UserCredentials;
-
-import io.casehub.connectors.calendar.model.CalendarEvent;
-import io.casehub.connectors.calendar.model.CalendarInfo;
-import io.casehub.connectors.calendar.model.EventDetails;
-import io.casehub.connectors.calendar.spi.CalendarPlatform;
 
 @ApplicationScoped
 public class GoogleCalendarPlatform implements CalendarPlatform {
@@ -97,38 +93,36 @@ public class GoogleCalendarPlatform implements CalendarPlatform {
     @Override
     public List<CalendarEvent> listEvents(String calendarId, Instant from, Instant to) {
         requireClient();
+        List<CalendarEvent> result = new ArrayList<>();
         try {
-            List<CalendarEvent> result = new ArrayList<>();
             String pageToken = null;
-            int page = 0;
+            int    page      = 0;
             while (page < MAX_PAGES) {
                 Events response = calendarService.events().list(calendarId)
-                        .setSingleEvents(true)
-                        .setOrderBy("startTime")
-                        .setTimeMin(new DateTime(from.toEpochMilli()))
-                        .setTimeMax(new DateTime(to.toEpochMilli()))
-                        .setPageToken(pageToken)
-                        .execute();
+                                                 .setSingleEvents(true)
+                                                 .setOrderBy("startTime")
+                                                 .setTimeMin(new DateTime(from.toEpochMilli()))
+                                                 .setTimeMax(new DateTime(to.toEpochMilli()))
+                                                 .setPageToken(pageToken)
+                                                 .execute();
                 if (response.getItems() != null) {
                     for (var event : response.getItems()) {
                         result.add(GoogleEventMapper.toCalendarEvent(event, calendarId));
                     }
                 }
                 pageToken = response.getNextPageToken();
-                if (pageToken == null) break;
+                if (pageToken == null) {break;}
                 page++;
             }
             if (page >= MAX_PAGES) {
                 LOG.warnf("listEvents hit MAX_PAGES (%d) for calendar '%s' — results may be incomplete",
-                        MAX_PAGES, calendarId);
+                          MAX_PAGES, calendarId);
             }
-            return Collections.unmodifiableList(result);
         } catch (IOException e) {
-            LOG.warnf(e, "listEvents failed mid-pagination for calendar '%s' — returning partial results",
-                    calendarId);
-            return List.of();
+            LOG.warnf(e, "listEvents failed mid-pagination for calendar '%s' — returning %d partial results",
+                      calendarId, result.size());
         }
-    }
+        return Collections.unmodifiableList(result);}
 
     @Override
     public CalendarEvent getEvent(String calendarId, String eventId) {
