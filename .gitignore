@@ -6,3 +6,5 @@ wksp
 .idea/
 .quinoa/
 chat-demo/chat-demo.db*
+.claude
+package-lock.json
