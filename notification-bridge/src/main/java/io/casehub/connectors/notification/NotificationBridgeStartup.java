@@ -2,6 +2,7 @@ package io.casehub.connectors.notification;
 
 import io.casehub.connectors.Connector;
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
+import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
 import io.casehub.platform.api.delivery.DestinationResolver;
 import io.casehub.platform.api.notification.NotificationSeverity;
@@ -15,6 +16,7 @@ import org.jboss.logging.Logger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Startup
 @ApplicationScoped
@@ -32,6 +34,8 @@ public class NotificationBridgeStartup {
     private static final Map<String, NotificationSeverity> RETRY_POLICIES = Map.of(
             "email", NotificationSeverity.WARNING,
             "sms", NotificationSeverity.WARNING);
+    private static final Set<String>                       PER_TENANT_CHANNELS = Set.of("slack", "teams");
+
 
     private final List<Connector>                        connectors;
     private final List<DestinationResolver>              resolvers;
@@ -99,7 +103,10 @@ public class NotificationBridgeStartup {
                     false,
                     NotificationSeverity.WARNING,
                     null,
-                    RETRY_POLICIES.get(channelType));
+                    RETRY_POLICIES.get(channelType),
+                    PER_TENANT_CHANNELS.contains(channelType)
+                            ? DestinationScope.PER_TENANT
+                            : DestinationScope.PER_USER);
 
             channelRegistry.register(descriptor, deliverer);
             LOG.infof("Bridged connector '%s' as notification channel '%s'%s",

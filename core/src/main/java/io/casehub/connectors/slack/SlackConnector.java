@@ -46,9 +46,6 @@ public class SlackConnector implements Connector {
         return ok;
     }
 
-    @Override
-    public String channelType() {return null;}
-
 
     /** Package-private for unit testing. */
     public static String buildPayload(final String title, final String body) {

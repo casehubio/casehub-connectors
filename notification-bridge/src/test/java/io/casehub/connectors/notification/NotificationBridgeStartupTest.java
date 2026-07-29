@@ -3,6 +3,7 @@ package io.casehub.connectors.notification;
 import io.casehub.connectors.Connector;
 import io.casehub.connectors.ConnectorMessage;
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
+import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
 import io.casehub.platform.api.delivery.DestinationResolver;
 import io.casehub.platform.api.delivery.NotificationDeliverer;
@@ -320,4 +321,42 @@ class NotificationBridgeStartupTest {
 
         assertThat(registry.deliverers).containsKey("custom-channel");
     }
+
+    @Test
+    void slackConnector_registersWithPerTenantScope() {
+        var registry = new RecordingRegistry();
+        var startup = new NotificationBridgeStartup(
+                List.of(new StubConnector("slack")), List.of(), List.of(), registry, EMPTY_CONFIG);
+        startup.registerBridgedChannels();
+
+        var desc = registry.descriptors.get("slack");
+        assertThat(desc).isNotNull();
+        assertThat(desc.destinationScope()).isEqualTo(DestinationScope.PER_TENANT);
+    }
+
+    @Test
+    void teamsConnector_registersWithPerTenantScope() {
+        var registry = new RecordingRegistry();
+        var startup = new NotificationBridgeStartup(
+                List.of(new StubConnector("teams")), List.of(), List.of(), registry, EMPTY_CONFIG);
+        startup.registerBridgedChannels();
+
+        var desc = registry.descriptors.get("teams");
+        assertThat(desc).isNotNull();
+        assertThat(desc.destinationScope()).isEqualTo(DestinationScope.PER_TENANT);
+    }
+
+    @Test
+    void emailConnector_registersWithPerUserScope() {
+        var registry = new RecordingRegistry();
+        var startup = new NotificationBridgeStartup(
+                List.of(new StubConnector("email")), List.of(), List.of(), registry, EMPTY_CONFIG);
+        startup.registerBridgedChannels();
+
+        var desc = registry.descriptors.get("email");
+        assertThat(desc).isNotNull();
+        assertThat(desc.destinationScope()).isEqualTo(DestinationScope.PER_USER);
+    }
+
+
 }
