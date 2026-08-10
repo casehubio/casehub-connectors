@@ -1,0 +1,152 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - text:      
+    - button "Settings" [ref=e5] [cursor=pointer]
+  - generic [ref=e16]:
+    - img "quarkus_logo_horizontal_rgb_1280px_reverse" [ref=e18] [cursor=pointer]
+    - generic [ref=e36]:
+      - generic [ref=e37]: Congratulations!
+      - generic [ref=e38]:
+        - heading "Application" [level=2]
+        - list [ref=e39]:
+          - listitem [ref=e40]:
+            - text: "GroupId:"
+            - code [ref=e41]: io.casehub
+          - listitem [ref=e42]:
+            - text: "ArtifactId:"
+            - code [ref=e43]: casehub-chat-app
+          - listitem [ref=e44]:
+            - text: "Version:"
+            - code [ref=e45]: 0.2-SNAPSHOT
+          - listitem [ref=e46]:
+            - text: "Quarkus Version:"
+            - code [ref=e47]: 3.32.2
+    - generic [ref=e48]:
+      - generic [ref=e49]:
+        - heading "You just made a Quarkus application." [level=1] [ref=e50]
+        - paragraph [ref=e51]: This page is served by the Quarkus Dev UI (only in dev mode) until you provide your own Web UI
+        - link "Visit the Dev UI" [ref=e52] [cursor=pointer]:
+          - /url: extensions
+        - generic [ref=e53]:
+          - link "Learn how you can add your own static web content" [ref=e55] [cursor=pointer]:
+            - /url: https://quarkus.io/guides/web
+          - generic [ref=e56]:
+            - text: "Static assets:"
+            - code [ref=e57]: src/main/resources/META-INF/resources/
+          - generic [ref=e58]:
+            - text: "App configuration:"
+            - code [ref=e59]: src/main/resources/application.properties
+          - generic [ref=e60]:
+            - text: "Code:"
+            - code [ref=e61]: src/main/java
+        - generic [ref=e62]:
+          - heading "Resource Endpoints" [level=3] [ref=e63]
+          - treegrid [ref=e66]:
+            - rowgroup [ref=e67]:
+              - row [ref=e68]:
+                - columnheader [ref=e69]:
+                  - generic [ref=e71] [cursor=pointer]:
+                    - generic [ref=e72]: URL
+                    - generic [ref=e73]: 
+                - columnheader [ref=e74]:
+                  - generic [ref=e76] [cursor=pointer]:
+                    - generic [ref=e77]: Description
+                    - generic [ref=e78]: 
+            - rowgroup [ref=e79]:
+              - row [ref=e80]:
+                - gridcell "/dev/auth/login" [ref=e81]
+                - 'gridcell "POST (consumes: application/json) (produces:application/json)" [ref=e84]'
+              - row [ref=e87]:
+                - 'gridcell "/api/channels/{channelId}" [ref=e88]'
+                - 'gridcell "DELETE (consumes: application/json) (produces:application/json)" [ref=e91]'
+              - row [ref=e94]:
+                - 'gridcell "/api/channels/{channelId}/members/{memberId}" [ref=e95]'
+                - 'gridcell "DELETE (consumes: application/json) (produces:application/json)" [ref=e98]'
+              - row [ref=e101]:
+                - 'gridcell "/api/channels/{channelId}/messages/{messageId}/reactions/{emoji}" [ref=e102]'
+                - 'gridcell "DELETE (consumes: application/json) (produces:application/json)" [ref=e105]'
+              - row [ref=e108]:
+                - gridcell "/api/channels" [ref=e109]
+                - 'gridcell "POST (consumes: application/json) (produces:application/json)" [ref=e112]'
+              - row [ref=e115]:
+                - 'gridcell "/api/channels/{channelId}/members" [ref=e116]'
+                - 'gridcell "POST (consumes: application/json) (produces:application/json)" [ref=e119]'
+              - row [ref=e122]:
+                - 'gridcell "/api/channels/{channelId}/messages" [ref=e123]'
+                - 'gridcell "POST (consumes: application/json) (produces:application/json)" [ref=e126]'
+              - row [ref=e129]:
+                - 'gridcell "/api/channels/{channelId}/messages/{messageId}/replies" [ref=e130]'
+                - 'gridcell "POST (consumes: application/json) (produces:application/json)" [ref=e133]'
+              - row [ref=e136]:
+                - 'gridcell "/api/channels/{channelId}/messages/{messageId}/reactions" [ref=e137]'
+                - 'gridcell "POST (consumes: application/json) (produces:application/json)" [ref=e140]'
+              - row [ref=e143]:
+                - gridcell [ref=e144]:
+                  - link "/api/channels" [ref=e146] [cursor=pointer]:
+                    - /url: /api/channels
+                - 'gridcell "GET (consumes: application/json) (produces:application/json)" [ref=e147]'
+              - row [ref=e150]:
+                - gridcell [ref=e151]:
+                  - 'link "/api/channels/{channelId}/members" [ref=e153] [cursor=pointer]':
+                    - /url: "/api/channels/{channelId}/members"
+                - 'gridcell "GET (consumes: application/json) (produces:application/json)" [ref=e154]'
+              - row [ref=e157]:
+                - gridcell [ref=e158]:
+                  - 'link "/api/channels/{channelId}/messages" [ref=e160] [cursor=pointer]':
+                    - /url: "/api/channels/{channelId}/messages"
+                - 'gridcell "GET (consumes: application/json) (produces:application/json)" [ref=e161]'
+              - row [ref=e164]:
+                - gridcell [ref=e165]:
+                  - 'link "/api/channels/{channelId}/messages/{messageId}/reactions" [ref=e167] [cursor=pointer]':
+                    - /url: "/api/channels/{channelId}/messages/{messageId}/reactions"
+                - 'gridcell "GET (consumes: application/json) (produces:application/json)" [ref=e168]'
+              - row [ref=e171]:
+                - gridcell [ref=e172]:
+                  - 'link "/api/presence/{memberId}" [ref=e174] [cursor=pointer]':
+                    - /url: "/api/presence/{memberId}"
+                - 'gridcell "GET (consumes: application/json) (produces:application/json)" [ref=e175]'
+              - row [ref=e178]:
+                - 'gridcell "/api/presence/{memberId}" [ref=e179]'
+                - 'gridcell "PUT (consumes: application/json) (produces:application/json)" [ref=e182]'
+            - rowgroup
+      - generic [ref=e185]:
+        - heading "Selected extensions" [level=3] [ref=e186]
+        - list [ref=e187]:
+          - listitem "Build time CDI dependency injection" [ref=e188]:
+            - text: ArC (
+            - link "Guide" [ref=e189] [cursor=pointer]:
+              - /url: https://quarkus.io/guides/cdi-reference
+            - text: )
+          - listitem "Jackson serialization support for Quarkus REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it" [ref=e190]:
+            - text: REST Jackson (
+            - link "Guide" [ref=e191] [cursor=pointer]:
+              - /url: https://quarkus.io/guides/rest#json-serialisation
+            - text: )
+          - listitem "Implementation of the WebSocket API with enhanced efficiency and usability" [ref=e192]:
+            - text: WebSockets Next (
+            - link "Guide" [ref=e193] [cursor=pointer]:
+              - /url: https://quarkus.io/guides/websockets-next-reference
+            - text: )
+          - listitem "Develop, build, and serve your npm-compatible web applications such as React, Angular, Vue, Lit, Svelte, Astro, SolidJS, and others alongside Quarkus." [ref=e194]:
+            - text: Quinoa (
+            - link "Guide" [ref=e195] [cursor=pointer]:
+              - /url: https://quarkiverse.github.io/quarkiverse-docs/quarkus-quinoa/dev/index.html
+            - text: )
+        - heading [level=3] [ref=e196]:
+          - link "Documentation" [ref=e197] [cursor=pointer]:
+            - /url: https://quarkus.io/guides/
+        - paragraph [ref=e198]: Practical step-by-step guides to help you achieve a specific goal. Use them to help get your work done.
+        - heading [level=3] [ref=e199]:
+          - link "Set up your IDE" [ref=e200] [cursor=pointer]:
+            - /url: https://quarkus.io/guides/tooling
+        - paragraph [ref=e201]: Everyone has a favorite IDE they like to use to code. Learn how to configure yours to maximize your Quarkus productivity.
+  - generic [ref=e205]:
+    - generic "Connected to ws://localhost:8090/q/dev-ui/json-rpc-ws" [ref=e207]
+    - generic:
+      - text: 
+      - generic:
+        - generic: Server
+        - generic: Testing
+        - generic: Quinoa
+        - generic: HTTP
+      - text: 

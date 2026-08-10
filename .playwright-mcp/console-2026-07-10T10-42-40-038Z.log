@@ -1,0 +1,10 @@
+[       0ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://slack.com/marketplace/A09QWKCDDGV-askdevices:0
+[      98ms] [LOG] JQMIGRATE: Migrate is installed with logging active, version 3.4.0 @ https://a.slack-edge.com/bv1-13-br/rollup-core_required_libs.47d9e011ac559a6c4750.min.js:129
+[     933ms] [INFO] Jul-10 11:42:40.970 [BOOT] booted! pri:0 version:1783668454 start_ms:1783680160090 (880ms ago) @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[     935ms] [WARNING] Jul-10 11:42:40.973 (T00000000) Clogger context could not be determined, using empty context @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[     936ms] [INFO] Jul-10 11:42:40.973 [TRACER] Tracing is not sampled by default for this session. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[     939ms] [WARNING] Jul-10 11:42:40.977 TELEMETRY You tried to get a team-specific telemeter but didn’t provide enough context and are getting the generic telemeter instead which is likely not what you want. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[     946ms] [INFO] Jul-10 11:42:40.983 [INFO] running without a user @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[     946ms] [ERROR] Jul-10 11:42:40.983 No React component named AdminMegaphoneHeaderContainer found. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[     950ms] [WARNING] Jul-10 11:42:40.987 TELEMETRY You tried to get a team-specific telemeter but didn’t provide enough context and are getting the generic telemeter instead which is likely not what you want. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    3248ms] [INFO] Jul-10 11:42:43.285 [WINDOW-UNLOADING] (T00000000) workspace handling window unloading event @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386

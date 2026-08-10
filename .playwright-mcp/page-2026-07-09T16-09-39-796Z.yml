@@ -1,0 +1,14 @@
+- generic [ref=f13e3]:
+  - generic [ref=f13e9] [cursor=pointer]: alice
+  - generic [ref=f13e12]:
+    - generic [ref=f13e14]:
+      - list
+      - button "Create Channel" [ref=f13e15] [cursor=pointer]
+    - generic [ref=f13e16]:
+      - generic [ref=f13e17]:
+        - generic [ref=f13e19]:
+          - button "Flat" [ref=f13e20] [cursor=pointer]
+          - button "Threaded" [ref=f13e21] [cursor=pointer]
+        - generic [ref=f13e23]: No messages yet
+      - textbox "Type a message..." [ref=f13e25]
+    - generic [ref=f13e28]: No members

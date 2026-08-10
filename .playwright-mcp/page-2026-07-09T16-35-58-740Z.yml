@@ -1,0 +1,40 @@
+- generic [ref=f29e8]:
+  - generic [active] [ref=f29e13]:
+    - generic [ref=f29e51] [cursor=pointer]: alice
+    - generic [ref=f29e52]:
+      - textbox "Type to filter…" [ref=f29e53]
+      - generic [ref=f29e54]:
+        - generic [ref=f29e55] [cursor=pointer]: alice
+        - generic [ref=f29e56] [cursor=pointer]: bob
+        - generic [ref=f29e57] [cursor=pointer]: charlie
+        - generic [ref=f29e58] [cursor=pointer]: agent-alpha
+        - generic [ref=f29e59] [cursor=pointer]: agent-beta
+        - generic [ref=f29e60] [cursor=pointer]: agent-gamma
+  - generic [ref=f29e17]:
+    - generic [ref=f29e19]:
+      - list [ref=f29e20]:
+        - option "📝 general Delete channel general" [ref=f29e21] [cursor=pointer]:
+          - generic [ref=f29e22]: 📝
+          - generic [ref=f29e23]: general
+          - button "Delete channel general" [ref=f29e24]: ✕
+        - option "📝 incidents Delete channel incidents" [ref=f29e25] [cursor=pointer]:
+          - generic [ref=f29e26]: 📝
+          - generic [ref=f29e27]: incidents
+          - button "Delete channel incidents" [ref=f29e28]: ✕
+        - option "📝 xxxx Delete channel xxxx" [ref=f29e29] [cursor=pointer]:
+          - generic [ref=f29e30]: 📝
+          - generic [ref=f29e31]: xxxx
+          - button "Delete channel xxxx" [ref=f29e32]: ✕
+        - option "📝 yyy Delete channel yyy" [ref=f29e33] [cursor=pointer]:
+          - generic [ref=f29e34]: 📝
+          - generic [ref=f29e35]: yyy
+          - button "Delete channel yyy" [ref=f29e36]: ✕
+      - button "Create Channel" [ref=f29e37] [cursor=pointer]
+    - generic [ref=f29e38]:
+      - generic [ref=f29e39]:
+        - generic [ref=f29e41]:
+          - button "Flat" [ref=f29e42] [cursor=pointer]
+          - button "Threaded" [ref=f29e43] [cursor=pointer]
+        - generic [ref=f29e45]: No messages yet
+      - textbox "Type a message..." [ref=f29e47]
+    - generic [ref=f29e50]: No members

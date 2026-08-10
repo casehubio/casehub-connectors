@@ -2,7 +2,6 @@
   "permissions": {
     "additionalDirectories": [
       "/Users/mdproctor/claude"
-    ],
-    "defaultMode": "acceptEdits"
+    ]
   }
 }

@@ -6,17 +6,68 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="casehub-connectors-slack-bot" />
-        <module name="casehub-connectors-chat-discord" />
-        <module name="casehub-connectors-chat-ref" />
-        <module name="casehub-connectors-email-inbound" />
+        <module name="casehub-platform-notifications-jpa" />
+        <module name="casehub-platform" />
+        <module name="casehub-platform-agent-api" />
+        <module name="casehub-platform-scim" />
+        <module name="casehub-connectors-notification-bridge" />
+        <module name="casehub-platform-endpoints-memory" />
+        <module name="casehub-platform-api" />
+        <module name="casehub-platform-notification-settings-inmem" />
+        <module name="casehub-platform-streams-poll" />
+        <module name="casehub-platform-digest-jpa" />
         <module name="casehub-connectors-chat-spi" />
-        <module name="casehub-connectors-discord" />
+        <module name="casehub-platform-streams-amqp" />
+        <module name="casehub-platform-persistence-jpa" />
+        <module name="casehub-platform-view-jpa" />
+        <module name="casehub-platform-notifications-inmem" />
+        <module name="casehub-platform-delivery-channel-inmem" />
+        <module name="casehub-platform-agent-claude" />
+        <module name="casehub-platform-datasource-jpa" />
+        <module name="casehub-platform-streams-camel" />
+        <module name="casehub-platform-datasource-inmem" />
+        <module name="casehub-platform-datasource-alpha" />
+        <module name="casehub-platform-notifications" />
+        <module name="casehub-platform-acl-jpa" />
+        <module name="casehub-connectors-email-inbound" />
+        <module name="casehub-platform-view" />
+        <module name="casehub-platform-testing" />
+        <module name="casehub-platform-expression" />
+        <module name="casehub-platform-preferences-editor" />
+        <module name="casehub-platform-governance" />
+        <module name="casehub-platform-credentials-quarkus" />
+        <module name="casehub-platform-delivery-tracking-inmem" />
+        <module name="casehub-connectors-calendar-ref" />
+        <module name="casehub-connectors-calendar-google" />
+        <module name="casehub-platform-subscriptions-jpa" />
         <module name="casehub-connectors-mcp" />
         <module name="casehub-connectors-chat-irc" />
+        <module name="casehub-platform-digest-inmem" />
+        <module name="casehub-platform-endpoints-config" />
+        <module name="casehub-connectors-slack-bot" />
+        <module name="casehub-platform-acl-inmem" />
+        <module name="casehub-platform-subscriptions-inmem" />
+        <module name="casehub-platform-agent-langchain4j" />
+        <module name="casehub-connectors-calendar-spi" />
+        <module name="casehub-platform-view-inmem" />
+        <module name="casehub-platform-identity" />
         <module name="casehub-connectors-email" />
+        <module name="casehub-platform-subscriptions" />
+        <module name="casehub-platform-config" />
+        <module name="casehub-platform-notification-dispatch" />
+        <module name="casehub-platform-oidc" />
+        <module name="casehub-platform-streams-webhook" />
+        <module name="casehub-platform-streams-kafka" />
+        <module name="casehub-connectors-discord" />
+        <module name="casehub-platform-delivery-tracking-jpa" />
+        <module name="casehub-platform-notification-settings-jpa" />
         <module name="casehub-connectors-core" />
         <module name="casehub-connectors-webhook" />
+        <module name="casehub-connectors-chat-slack" />
+        <module name="casehub-connectors-chat-discord" />
+        <module name="casehub-platform-persistence-mongodb" />
+        <module name="casehub-connectors-chat-ref" />
+        <module name="casehub-chat-app" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
@@ -25,17 +76,69 @@
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="casehub-chat-app" options="-parameters" />
+      <module name="casehub-connectors-calendar-google" options="-parameters" />
+      <module name="casehub-connectors-calendar-ref" options="-parameters" />
+      <module name="casehub-connectors-calendar-spi" options="-parameters" />
       <module name="casehub-connectors-chat-discord" options="-parameters" />
       <module name="casehub-connectors-chat-irc" options="-parameters" />
       <module name="casehub-connectors-chat-ref" options="-parameters" />
+      <module name="casehub-connectors-chat-slack" options="-parameters" />
       <module name="casehub-connectors-chat-spi" options="-parameters" />
       <module name="casehub-connectors-core" options="-parameters" />
       <module name="casehub-connectors-discord" options="-parameters" />
       <module name="casehub-connectors-email" options="-parameters" />
       <module name="casehub-connectors-email-inbound" options="-parameters" />
       <module name="casehub-connectors-mcp" options="-parameters" />
+      <module name="casehub-connectors-notification-bridge" options="-parameters" />
       <module name="casehub-connectors-slack-bot" options="-parameters" />
       <module name="casehub-connectors-webhook" options="-parameters" />
+      <module name="casehub-platform" options="-parameters" />
+      <module name="casehub-platform-acl-inmem" options="-parameters" />
+      <module name="casehub-platform-acl-jpa" options="-parameters" />
+      <module name="casehub-platform-agent-api" options="-parameters" />
+      <module name="casehub-platform-agent-claude" options="-parameters" />
+      <module name="casehub-platform-agent-langchain4j" options="-parameters" />
+      <module name="casehub-platform-api" options="-parameters" />
+      <module name="casehub-platform-config" options="-parameters" />
+      <module name="casehub-platform-credentials-quarkus" options="-parameters" />
+      <module name="casehub-platform-datasource-alpha" options="-parameters" />
+      <module name="casehub-platform-datasource-inmem" options="-parameters" />
+      <module name="casehub-platform-datasource-jpa" options="-parameters" />
+      <module name="casehub-platform-delivery-channel-inmem" options="-parameters" />
+      <module name="casehub-platform-delivery-tracking-inmem" options="-parameters" />
+      <module name="casehub-platform-delivery-tracking-jpa" options="-parameters" />
+      <module name="casehub-platform-digest-inmem" options="-parameters" />
+      <module name="casehub-platform-digest-jpa" options="-parameters" />
+      <module name="casehub-platform-endpoints-config" options="-parameters" />
+      <module name="casehub-platform-endpoints-memory" options="-parameters" />
+      <module name="casehub-platform-expression" options="-parameters" />
+      <module name="casehub-platform-governance" options="-parameters" />
+      <module name="casehub-platform-identity" options="-parameters" />
+      <module name="casehub-platform-notification-dispatch" options="-parameters" />
+      <module name="casehub-platform-notification-settings-inmem" options="-parameters" />
+      <module name="casehub-platform-notification-settings-jpa" options="-parameters" />
+      <module name="casehub-platform-notifications" options="-parameters" />
+      <module name="casehub-platform-notifications-inmem" options="-parameters" />
+      <module name="casehub-platform-notifications-jpa" options="-parameters" />
+      <module name="casehub-platform-oidc" options="-parameters" />
+      <module name="casehub-platform-parent" options="-parameters" />
+      <module name="casehub-platform-persistence-jpa" options="-parameters" />
+      <module name="casehub-platform-persistence-mongodb" options="-parameters" />
+      <module name="casehub-platform-preferences-editor" options="-parameters" />
+      <module name="casehub-platform-scim" options="-parameters" />
+      <module name="casehub-platform-streams-amqp" options="-parameters" />
+      <module name="casehub-platform-streams-camel" options="-parameters" />
+      <module name="casehub-platform-streams-kafka" options="-parameters" />
+      <module name="casehub-platform-streams-poll" options="-parameters" />
+      <module name="casehub-platform-streams-webhook" options="-parameters" />
+      <module name="casehub-platform-subscriptions" options="-parameters" />
+      <module name="casehub-platform-subscriptions-inmem" options="-parameters" />
+      <module name="casehub-platform-subscriptions-jpa" options="-parameters" />
+      <module name="casehub-platform-testing" options="-parameters" />
+      <module name="casehub-platform-view" options="-parameters" />
+      <module name="casehub-platform-view-inmem" options="-parameters" />
+      <module name="casehub-platform-view-jpa" options="-parameters" />
     </option>
   </component>
 </project>

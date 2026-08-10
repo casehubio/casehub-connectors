@@ -1,0 +1,37 @@
+- generic [ref=f69e4]:
+  - generic [ref=f69e5]:
+    - button "💬" [ref=f69e6] [cursor=pointer]
+    - button "👥" [ref=f69e7] [cursor=pointer]
+    - button "🌙" [ref=f69e8] [cursor=pointer]
+  - generic [ref=f69e9]:
+    - generic [ref=f69e11] [cursor=pointer]:
+      - generic [ref=f69e12]: a
+      - generic [ref=f69e13]: alice
+      - generic [ref=f69e14]: ▼
+    - generic [ref=f69e15]:
+      - list [ref=f69e16]:
+        - option "# general Delete channel general" [ref=f69e17] [cursor=pointer]:
+          - generic [ref=f69e18]: "#"
+          - generic [ref=f69e19]: general
+          - button "Delete channel general" [ref=f69e20]: ✕
+        - option "# incidents Delete channel incidents" [ref=f69e21] [cursor=pointer]:
+          - generic [ref=f69e22]: "#"
+          - generic [ref=f69e23]: incidents
+          - button "Delete channel incidents" [ref=f69e24]: ✕
+        - option "# xxxx Delete channel xxxx" [ref=f69e25] [cursor=pointer]:
+          - generic [ref=f69e26]: "#"
+          - generic [ref=f69e27]: xxxx
+          - button "Delete channel xxxx" [ref=f69e28]: ✕
+        - option "# yyy Delete channel yyy" [ref=f69e29] [cursor=pointer]:
+          - generic [ref=f69e30]: "#"
+          - generic [ref=f69e31]: yyy
+          - button "Delete channel yyy" [ref=f69e32]: ✕
+      - button "Create Channel" [ref=f69e33] [cursor=pointer]
+  - generic [ref=f69e34]:
+    - generic [ref=f69e35]:
+      - generic [ref=f69e37]:
+        - button "Flat" [ref=f69e38] [cursor=pointer]
+        - button "Threaded" [ref=f69e39] [cursor=pointer]
+      - generic [ref=f69e41]: No messages yet
+    - textbox "Type a message..." [ref=f69e43]
+  - generic [ref=f69e46]: No members

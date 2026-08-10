@@ -1,0 +1,4 @@
+- generic [ref=f5e3]:
+  - heading "Login" [level=2] [ref=f5e4]
+  - combobox "Choose or type a name" [ref=f5e5]
+  - button "Login" [ref=f5e6] [cursor=pointer]

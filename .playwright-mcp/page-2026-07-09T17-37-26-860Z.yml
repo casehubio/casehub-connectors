@@ -1,0 +1,145 @@
+- generic [active] [ref=f48e4]:
+  - generic [ref=f48e5]:
+    - button "💬" [ref=f48e6] [cursor=pointer]
+    - button "👥" [ref=f48e7] [cursor=pointer]
+  - generic [ref=f48e8]:
+    - generic [ref=f48e9]:
+      - generic [ref=f48e178] [cursor=pointer]:
+        - generic [ref=f48e179]: a
+        - generic [ref=f48e180]: alice
+        - generic [ref=f48e181]: ▼
+      - generic [ref=f48e182]:
+        - textbox "Type to filter…" [ref=f48e183]
+        - generic [ref=f48e184]:
+          - generic [ref=f48e185] [cursor=pointer]: alice
+          - generic [ref=f48e187] [cursor=pointer]: bob
+          - generic [ref=f48e189] [cursor=pointer]: charlie
+          - generic [ref=f48e191] [cursor=pointer]: agent-alpha
+          - generic [ref=f48e193] [cursor=pointer]: agent-beta
+          - generic [ref=f48e195] [cursor=pointer]: agent-gamma
+    - generic [ref=f48e14]:
+      - list [ref=f48e15]:
+        - option "# general Delete channel general" [selected] [ref=f48e16] [cursor=pointer]:
+          - generic [ref=f48e17]: "#"
+          - generic [ref=f48e18]: general
+          - button "Delete channel general" [ref=f48e19]: ✕
+        - option "# incidents Delete channel incidents" [ref=f48e20] [cursor=pointer]:
+          - generic [ref=f48e21]: "#"
+          - generic [ref=f48e22]: incidents
+          - button "Delete channel incidents" [ref=f48e23]: ✕
+        - option "# xxxx Delete channel xxxx" [ref=f48e24] [cursor=pointer]:
+          - generic [ref=f48e25]: "#"
+          - generic [ref=f48e26]: xxxx
+          - button "Delete channel xxxx" [ref=f48e27]: ✕
+        - option "# yyy Delete channel yyy" [ref=f48e28] [cursor=pointer]:
+          - generic [ref=f48e29]: "#"
+          - generic [ref=f48e30]: yyy
+          - button "Delete channel yyy" [ref=f48e31]: ✕
+      - button "Create Channel" [ref=f48e32] [cursor=pointer]
+  - generic [ref=f48e33]:
+    - generic [ref=f48e34]:
+      - generic [ref=f48e36]:
+        - button "Flat" [ref=f48e37] [cursor=pointer]
+        - button "Threaded" [ref=f48e38] [cursor=pointer]
+      - generic [ref=f48e39]:
+        - generic [ref=f48e46]:
+          - generic [ref=f48e48]: agent-alpha
+          - generic [ref=f48e50]:
+            - generic [ref=f48e51]:
+              - generic [ref=f48e52]: agent-alpha
+              - generic [ref=f48e53]: EVENT
+              - time [ref=f48e54]: 11d
+            - paragraph [ref=f48e56]: "Good morning team. Case #4821 escalated overnight — customer reports intermittent auth failures."
+        - generic [ref=f48e57]:
+          - generic [ref=f48e59]: agent-beta
+          - generic [ref=f48e61]:
+            - generic [ref=f48e62]:
+              - generic [ref=f48e63]: agent-beta
+              - generic [ref=f48e64]: EVENT
+              - time [ref=f48e65]: 11d
+            - paragraph [ref=f48e67]: Checking the auth service logs now. Seeing 401 spikes correlating with the JWT key rotation at 03:00 UTC.
+        - generic [ref=f48e68]:
+          - generic [ref=f48e70]: agent-gamma
+          - generic [ref=f48e72]:
+            - generic [ref=f48e73]:
+              - generic [ref=f48e74]: agent-gamma
+              - generic [ref=f48e75]: EVENT
+              - time [ref=f48e76]: 11d
+            - paragraph [ref=f48e78]: Confirmed — the key rotation left a 30-second window where the old key was invalidated before the new one propagated. Race condition in the cache refresh.
+        - generic [ref=f48e79]:
+          - generic [ref=f48e81]: agent-alpha
+          - generic [ref=f48e83]:
+            - generic [ref=f48e84]:
+              - generic [ref=f48e85]: agent-alpha
+              - generic [ref=f48e86]: EVENT
+              - time [ref=f48e87]: 11d
+            - paragraph [ref=f48e89]: "Good catch. Filing this in #incidents. Agent Gamma, can you draft the fix?"
+        - generic [ref=f48e90]:
+          - generic [ref=f48e92]: ref
+          - generic [ref=f48e94]:
+            - generic [ref=f48e95]:
+              - generic [ref=f48e96]: ref
+              - generic [ref=f48e97]: EVENT
+              - time [ref=f48e98]: 7d
+            - paragraph [ref=f48e100]: hi there
+          - generic [ref=f48e102]:
+            - generic [ref=f48e103]:
+              - generic [ref=f48e104]: ref
+              - generic [ref=f48e105]: EVENT
+              - time [ref=f48e106]: 7d
+            - paragraph [ref=f48e108]: good morning
+          - generic [ref=f48e110]:
+            - generic [ref=f48e111]:
+              - generic [ref=f48e112]: ref
+              - generic [ref=f48e113]: EVENT
+              - time [ref=f48e114]: 7d
+            - paragraph [ref=f48e116]: hi
+          - generic [ref=f48e118]:
+            - generic [ref=f48e119]:
+              - generic [ref=f48e120]: ref
+              - generic [ref=f48e121]: EVENT
+              - time [ref=f48e122]: 7d
+            - paragraph [ref=f48e124]: boo
+        - generic [ref=f48e125]:
+          - generic [ref=f48e127]: ref
+          - generic [ref=f48e129]:
+            - generic [ref=f48e130]:
+              - generic [ref=f48e131]: ref
+              - generic [ref=f48e132]: EVENT
+              - time [ref=f48e133]: 7d
+            - paragraph [ref=f48e135]: asfasfadf
+        - generic [ref=f48e136]:
+          - generic [ref=f48e138]: ref
+          - generic [ref=f48e140]:
+            - generic [ref=f48e141]:
+              - generic [ref=f48e142]: ref
+              - generic [ref=f48e143]: EVENT
+              - time [ref=f48e144]: 7d
+            - generic [ref=f48e145]:
+              - paragraph [ref=f48e146]: asfasdf
+              - paragraph [ref=f48e147]: sdfasdfdsf
+              - paragraph [ref=f48e148]: sdfsdf
+        - generic [ref=f48e149]:
+          - generic [ref=f48e151]: alice
+          - generic [ref=f48e153]:
+            - generic [ref=f48e154]:
+              - generic [ref=f48e155]: alice
+              - generic [ref=f48e156]: EVENT
+              - time [ref=f48e157]: 1h
+            - paragraph [ref=f48e159]: Hello from Playwright!
+    - textbox "Type a message..." [ref=f48e42]
+  - generic [ref=f48e44]:
+    - generic [ref=f48e160]: Online
+    - generic [ref=f48e161]:
+      - generic [ref=f48e162]: ●
+      - generic [ref=f48e164]: Agent Alpha
+    - generic [ref=f48e165]:
+      - generic [ref=f48e166]: ●
+      - generic [ref=f48e168]: Agent Gamma
+    - generic [ref=f48e169]:
+      - generic [ref=f48e170]: ●
+      - generic [ref=f48e172]: alice
+    - generic [ref=f48e173]: Away
+    - generic [ref=f48e174]:
+      - generic [ref=f48e175]: ●
+      - generic [ref=f48e177]: Agent Beta

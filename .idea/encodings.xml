@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/../chat-app/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../chat-app/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/calendar-google/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/calendar-google/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/calendar-ref/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/calendar-ref/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/calendar-spi/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/calendar-spi/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-discord/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-discord/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-irc/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-irc/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-ref/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-ref/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/chat-slack/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/chat-slack/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-spi/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/chat-spi/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/connectors-core/src/main/java" charset="UTF-8" />
@@ -23,11 +33,105 @@
     <file url="file://$PROJECT_DIR$/email/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/mcp/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/mcp/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notification-bridge/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notification-bridge/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/slack-bot/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/slack-bot/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/webhook/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/webhook/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/acl-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/acl-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/acl-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/acl-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/agent-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/agent-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/agent-claude/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/agent-claude/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/agent-langchain4j/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/agent-langchain4j/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/config/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/config/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/credentials-quarkus/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/credentials-quarkus/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/datasource-alpha/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/datasource-alpha/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/datasource-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/datasource-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/datasource-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/datasource-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/delivery-channel-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/delivery-channel-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/delivery-tracking-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/delivery-tracking-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/delivery-tracking-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/delivery-tracking-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/digest-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/digest-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/digest-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/digest-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/endpoints-config/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/endpoints-config/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/endpoints-memory/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/endpoints-memory/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/expression/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/expression/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/governance/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/governance/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/identity/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/identity/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notification-dispatch/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notification-dispatch/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notification-settings-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notification-settings-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notification-settings-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notification-settings-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notifications-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notifications-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notifications-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notifications-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notifications/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/notifications/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/oidc/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/oidc/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/persistence-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/persistence-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/persistence-mongodb/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/persistence-mongodb/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-view-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-view-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-view-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-view-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-view/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform-view/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/platform/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/preferences-editor/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/preferences-editor/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/scim/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/scim/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-amqp/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-amqp/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-camel/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-camel/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-kafka/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-kafka/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-poll/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-poll/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-webhook/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/streams-webhook/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/subscriptions-inmem/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/subscriptions-inmem/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/subscriptions-jpa/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/subscriptions-jpa/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/subscriptions/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/subscriptions/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/testing/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../platform/testing/src/main/resources" charset="UTF-8" />
   </component>
 </project>

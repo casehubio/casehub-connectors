@@ -1,0 +1,66 @@
+[    6687ms] [INFO] %c BeeHeard %c 128 color: white; background: blue;  @ :0
+[   30185ms] [ERROR] Failed to load resource: net::ERR_TIMED_OUT @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1286736ms] [INFO] %c BeeHeard %c 113 color: white; background: blue;  @ :0
+[ 1334454ms] [LOG] PROD @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1336349ms] [LOG] PROD @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1336772ms] [INFO] %c BeeHeard %c 107 color: white; background: blue;  @ :0
+[ 1339900ms] [LOG] deviceList:  Proxy(Array) @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1339913ms] [LOG] date:  August 13, 2025  |  days between:  0 @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1340538ms] [LOG] [header.verifyIfIsByPassUser] isAdmin value from API: false @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1340948ms] [LOG] [header.verifyIfAdminSupport] isAdminSupport value from API: false @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1341954ms] [LOG] [header.verifyIfAdminNotReturn] isAdminNotReturn value from API: false @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1344607ms] [LOG] {"viewAssets":2} @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1344607ms] [LOG] [{"label":"Active","value":"viewAssets","title":"Active Devices","count":2},{"label":"Open requests","value":"openRequest","title":"Open Requests","count":0},{"label":"Pending returns","value":"awaitReturn","title":"Return Devices","count":0}] @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1344607ms] [LOG] Guidedtourdone?-- null @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1344615ms] [LOG] deviceList:  Proxy(Array) @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1465746ms] [LOG] USER CC:  undefined @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1465753ms] [LOG] USER CC:  866 @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1467479ms] [LOG] USER CC:  866 @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1482028ms] [LOG] created recipient... {"managerSerialNumber":"132941","employeeCountryCode":"866","managerCountryCode":"866","ibmSerialNumber":"004839","preferredIdentity":"steve_wallin@uk.ibm.com","firstName":"Steven","lastName":"Wallin","organizationCode":"PZ","companyCode":"8660","div":"7D","dept":"450931","employeeType":"P","managerFlag":true,"glTeamLeadSnCc":"960246897","ventureCode":"","jobResponsibilities":"Director of Engineering - Core Integration, UK R&D Labs leader","workLoc":"HUR","enableToDevice":true,"userTierBean":{"tierNumber":3,"tierName":"POWER-PLUS","tierContextDescription":"BAND A, B, C, D","bandCode":"D","tierContextName":"EXEC-BAND","tierFromDB":true},"hrCountryCode":"GB","translatedHRCountryCode":"866","fedUserType":null,"countryCodeISOalpha3":"GBR","empSnCc":"004839866","managerSnCc":"132941866"} @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1482028ms] [LOG] mounted recipient... {"managerSerialNumber":"132941","employeeCountryCode":"866","managerCountryCode":"866","ibmSerialNumber":"004839","preferredIdentity":"steve_wallin@uk.ibm.com","firstName":"Steven","lastName":"Wallin","organizationCode":"PZ","companyCode":"8660","div":"7D","dept":"450931","employeeType":"P","managerFlag":true,"glTeamLeadSnCc":"960246897","ventureCode":"","jobResponsibilities":"Director of Engineering - Core Integration, UK R&D Labs leader","workLoc":"HUR","enableToDevice":true,"userTierBean":{"tierNumber":3,"tierName":"POWER-PLUS","tierContextDescription":"BAND A, B, C, D","bandCode":"D","tierContextName":"EXEC-BAND","tierFromDB":true},"hrCountryCode":"GB","translatedHRCountryCode":"866","fedUserType":null,"countryCodeISOalpha3":"GBR","empSnCc":"004839866","managerSnCc":"132941866"} @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1482029ms] [LOG] USER CC:  866 @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1482029ms] [LOG] USER CC:  866 @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1482029ms] [LOG] USER CC:  866 @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1524224ms] [LOG] SELECTYED DEVICES:  Proxy(Array) @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1524226ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1524228ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1526602ms] [LOG] response: [{"type":"BLUEPAGES_ADDRESS","fullName":"My Preferred Business Address","address":"","city":"","state":"","country":"GB","countryName":"United%20Kingdom","zip":"","sysId":"preferred","isEditable":true},{"type":"BLUEPAGES_ADDRESS","fullName":"My Bluepages Location Address","address":"Hursley Park","city":"Hursley","state":"","country":"GB","countryName":"United%20Kingdom","zip":"SO212JN","sysId":"bluepages","isEditable":true}] @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1526602ms] [LOG] [shippingLabelBoxModal.vue] it has data. @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1526603ms] [LOG] ***** arr: [{"text":"My Preferred Business Address","value":"preferred"},{"text":"My Bluepages Location Address","value":"bluepages"}] @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1526603ms] [LOG] ***** shippingLabelBoxData: {"type":"BLUEPAGES_ADDRESS","fullName":"My Preferred Business Address","address":"","city":"","state":"","country":"GB","countryName":"United%20Kingdom","zip":"","sysId":"preferred","isEditable":true,"selectedIbmSite":"preferred","shipContact":"Steven Wallin"} @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1526603ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1544355ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1545347ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1549732ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1551449ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1552024ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 1554107ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2674147ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2684657ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2686844ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2687570ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2698030ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2698241ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2698328ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 2701368ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3063585ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3063945ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3064157ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3065500ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3066084ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3068097ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3136387ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3150765ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3152173ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3152231ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3227894ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3228033ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3228180ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3228301ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3228515ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3228639ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3228741ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3229053ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3229266ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3229376ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0
+[ 3229452ms] [LOG] User edited an address. So type should now be preferred @ https://devices.devicesibm.wdc.app.cirrus.ibm.com/js/app.eb33ec9b.js:0

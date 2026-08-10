@@ -1,0 +1,10 @@
+[      -4ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://slack.com/marketplace/A09QWKCDDGV-askdevices:0
+[     408ms] [LOG] JQMIGRATE: Migrate is installed with logging active, version 3.4.0 @ https://a.slack-edge.com/bv1-13-br/rollup-core_required_libs.47d9e011ac559a6c4750.min.js:129
+[    1533ms] [INFO] Jul-10 11:38:12.594 [BOOT] booted! pri:0 version:1783668454 start_ms:1783679891445 (1149ms ago) @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    1536ms] [WARNING] Jul-10 11:38:12.598 (T00000000) Clogger context could not be determined, using empty context @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    1537ms] [INFO] Jul-10 11:38:12.598 [TRACER] Tracing is not sampled by default for this session. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    1542ms] [WARNING] Jul-10 11:38:12.603 TELEMETRY You tried to get a team-specific telemeter but didn’t provide enough context and are getting the generic telemeter instead which is likely not what you want. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    1712ms] [INFO] Jul-10 11:38:12.773 [INFO] running without a user @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    1713ms] [ERROR] Jul-10 11:38:12.775 No React component named AdminMegaphoneHeaderContainer found. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    1717ms] [WARNING] Jul-10 11:38:12.778 TELEMETRY You tried to get a team-specific telemeter but didn’t provide enough context and are getting the generic telemeter instead which is likely not what you want. @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
+[    6856ms] [INFO] Jul-10 11:38:17.918 [WINDOW-UNLOADING] (T00000000) workspace handling window unloading event @ https://a.slack-edge.com/bv1-13-br/modern.vendor.04505bf5d32595bd287f.min.js:386
