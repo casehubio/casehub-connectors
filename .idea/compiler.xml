@@ -9,6 +9,7 @@
         <module name="casehub-platform-notifications-jpa" />
         <module name="casehub-platform" />
         <module name="casehub-platform-agent-api" />
+        <module name="casehub-platform-acl-admin" />
         <module name="casehub-platform-scim" />
         <module name="casehub-connectors-notification-bridge" />
         <module name="casehub-platform-endpoints-memory" />
@@ -64,6 +65,7 @@
         <module name="casehub-connectors-core" />
         <module name="casehub-connectors-webhook" />
         <module name="casehub-connectors-chat-slack" />
+        <module name="casehub-platform-agent-gate" />
         <module name="casehub-connectors-chat-discord" />
         <module name="casehub-platform-persistence-mongodb" />
         <module name="casehub-connectors-chat-ref" />
@@ -94,10 +96,12 @@
       <module name="casehub-connectors-slack-bot" options="-parameters" />
       <module name="casehub-connectors-webhook" options="-parameters" />
       <module name="casehub-platform" options="-parameters" />
+      <module name="casehub-platform-acl-admin" options="-parameters" />
       <module name="casehub-platform-acl-inmem" options="-parameters" />
       <module name="casehub-platform-acl-jpa" options="-parameters" />
       <module name="casehub-platform-agent-api" options="-parameters" />
       <module name="casehub-platform-agent-claude" options="-parameters" />
+      <module name="casehub-platform-agent-gate" options="-parameters" />
       <module name="casehub-platform-agent-langchain4j" options="-parameters" />
       <module name="casehub-platform-api" options="-parameters" />
       <module name="casehub-platform-config" options="-parameters" />
