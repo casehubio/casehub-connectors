@@ -1,20 +1,19 @@
 package io.casehub.connectors;
 
+import io.quarkus.arc.All;
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Event;
-import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
-
-import io.quarkus.arc.All;
-import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.StartupEvent;
 
 /**
  * CDI service that manages pull-based {@link InboundConnector} lifecycle and acts
@@ -69,6 +68,11 @@ public class InboundConnectorService {
                             "Duplicate inbound connector id: '" + a.id() + "'");
                 }));
     }
+
+    public static InboundConnectorService withEventBus(final List<InboundConnector> pullConnectors, final Consumer<InboundMessage> eventBus) {
+        return new InboundConnectorService(pullConnectors, eventBus);
+    }
+
 
     void onStart(@Observes final StartupEvent ignored) {
         pullRegistry.values().forEach(c -> {
