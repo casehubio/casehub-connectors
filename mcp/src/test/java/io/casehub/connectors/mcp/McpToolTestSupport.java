@@ -67,6 +67,6 @@ public final class McpToolTestSupport {
 
     /** Builds a ConnectorService backed only by the given connectors. */
     static ConnectorService serviceWith(final Connector... connectors) {
-        return new ConnectorService(List.of(connectors));
+        return ConnectorService.withEventSink(List.of(connectors), msg -> {});
     }
 }

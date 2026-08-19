@@ -6,45 +6,43 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
-/**
- * Routes outbound messages to the appropriate {@link Connector} by id.
- *
- * <p>
- * All registered {@link Connector} CDI beans are discovered at startup and indexed
- * by id. Duplicate ids cause startup failure. Unknown ids throw
- * {@link IllegalArgumentException} with the set of available ids in the message.
- *
- * <p>
- * Callers should inject this service rather than working with {@link Connector}
- * beans directly.
- */
 @ApplicationScoped
 public class ConnectorService {
 
-    private final Map<String, Connector> registry;
+    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(ConnectorService.class.getName());
 
-    public ConnectorService(@All final List<Connector> connectors) {
-        this.registry = connectors.stream()
-                .collect(Collectors.toMap(
-                        Connector::id,
-                        Function.identity(),
-                        (a, b) -> {
-                            throw new IllegalStateException(
-                                    "Duplicate connector id: '" + a.id() + "'");
-                        }));
+    private final Map<String, Connector>                   registry;
+    private final java.util.function.Consumer<SentMessage> eventSink;
+
+    @jakarta.inject.Inject
+    public ConnectorService(@All final List<Connector> connectors,
+                            final jakarta.enterprise.event.Event<SentMessage> sentMessageEvent) {
+        this(connectors, msg -> sentMessageEvent.fireAsync(msg)
+                                                .exceptionally(ex -> {
+                                                    LOG.log(java.util.logging.Level.SEVERE, "Async SentMessage dispatch failed", ex);
+                                                    return null;
+                                                }));
     }
 
-    /**
-     * Send a message via the named connector.
-     *
-     * @param connectorId id of the connector to use (e.g. {@code "slack"})
-     * @param message     the message to deliver
-     * @return true if the connector reported success
-     * @throws IllegalArgumentException if no connector is registered for {@code connectorId}
-     */
+    ConnectorService(final List<Connector> connectors,
+                     final java.util.function.Consumer<SentMessage> eventSink) {
+        this.eventSink = eventSink;
+        this.registry  = connectors.stream()
+                                   .collect(java.util.stream.Collectors.toMap(
+                                           Connector::id,
+                                           java.util.function.Function.identity(),
+                                           (a, b) -> {
+                                               throw new IllegalStateException(
+                                                       "Duplicate connector id: '" + a.id() + "'");
+                                           }));
+    }
+
+    public static ConnectorService withEventSink(final List<Connector> connectors, final java.util.function.Consumer<SentMessage> eventSink) {
+        return new ConnectorService(connectors, eventSink);
+    }
+
+
     public boolean send(final String connectorId, final ConnectorMessage message) {
         final Connector connector = registry.get(connectorId);
         if (connector == null) {
@@ -52,19 +50,17 @@ public class ConnectorService {
                     "No connector registered for id '" + connectorId
                     + "'. Available: " + registry.keySet());
         }
-        return connector.send(message);
+        boolean success = connector.send(message);
+        eventSink.accept(new SentMessage(
+                connectorId, message.destination(), message.title(),
+                message.body(), java.time.Instant.now(), success));
+        return success;
     }
 
-    /**
-     * Returns {@code true} if a connector with the given id is registered.
-     */
     public boolean supports(final String connectorId) {
         return registry.containsKey(connectorId);
     }
 
-    /**
-     * Returns the ids of all registered connectors.
-     */
     public Set<String> ids() {
         return Set.copyOf(registry.keySet());
     }

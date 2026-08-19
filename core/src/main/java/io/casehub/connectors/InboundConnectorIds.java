@@ -17,6 +17,8 @@ public final class InboundConnectorIds {
     public static final String TEAMS_INBOUND = "teams-inbound";
     public static final String IRC = "irc-inbound";
     public static final String DISCORD_INBOUND = "discord-inbound";
+    public static final String CHAT_INJECT     = "chat-inject";
+
 
     private InboundConnectorIds() {}
 }
